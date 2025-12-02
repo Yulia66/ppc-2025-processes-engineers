@@ -10,6 +10,7 @@ namespace artyushkina_string_matrix {
 
 using InType = std::vector<std::vector<int>>;
 using OutType = std::vector<int>;
-using TestType = std::tuple<InType, OutType>;
+using TestType = std::string;
 using BaseTask = ppc::task::Task<InType, OutType>;
+
 }  // namespace artyushkina_string_matrix
