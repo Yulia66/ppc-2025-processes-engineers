@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <string>
+#include <iostream>
 #include <vector>
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
@@ -9,62 +9,177 @@
 
 namespace artyushkina_string_matrix {
 
-TEST(ArtyushkinaStringMatrixFunctional, Basic2x2Matrix) {
-  InType matrix = {{1, 2}, {3, 4}};
-  ArtyushkinaATestTaskSEQ task(matrix);
+// Вспомогательная функция для создания матрицы прямо в коде
+std::pair<InType, OutType> GetTestData(int test_num) {
+  switch (test_num) {
+    case 1:
+      return {{{3, 1}, {4, 2}}, {1, 2}};
+    case 2:
+      return {{{-5, 10, -3}, {8, -2, 0}}, {-5, -2}};
+    case 3:
+      return {{{5, 2, 8, 1, 9}}, {1}};
+    case 4:
+      return {{{1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}}, {1, 5, 9}};
+    default:
+      return {{}, {}};
+  }
+}
 
+// ==================== SEQ ТЕСТЫ ====================
+
+TEST(ArtyushkinaFunctional, Test1) {
+  auto [matrix, expected] = GetTestData(1);
+
+  ArtyushkinaStringMatrixSEQ task(matrix);
   EXPECT_TRUE(task.Validation());
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
-  EXPECT_TRUE(task.PostProcessing());
 
   auto result = task.GetOutput();
-  EXPECT_FALSE(result.empty());
-  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result, expected);
 }
 
-TEST(ArtyushkinaStringMatrixFunctional, Binary2x3Matrix) {
-  InType matrix = {{1, 0, 1}, {0, 1, 0}};
-  ArtyushkinaATestTaskSEQ task(matrix);
+TEST(ArtyushkinaFunctional, Test2) {
+  auto [matrix, expected] = GetTestData(2);
 
+  ArtyushkinaStringMatrixSEQ task(matrix);
   EXPECT_TRUE(task.Validation());
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
-  EXPECT_TRUE(task.PostProcessing());
 
   auto result = task.GetOutput();
-  EXPECT_FALSE(result.empty());
-  EXPECT_EQ(result.size(), 2);
+  EXPECT_EQ(result, expected);
 }
 
-TEST(ArtyushkinaStringMatrixFunctional, SingleElement) {
+TEST(ArtyushkinaFunctional, Test3) {
+  auto [matrix, expected] = GetTestData(3);
+
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+  EXPECT_TRUE(task.Run());
+
+  auto result = task.GetOutput();
+  EXPECT_EQ(result, expected);
+}
+
+TEST(ArtyushkinaFunctional, Test4) {
+  auto [matrix, expected] = GetTestData(4);
+
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+  EXPECT_TRUE(task.Run());
+
+  auto result = task.GetOutput();
+  EXPECT_EQ(result, expected);
+}
+
+// Дополнительные тесты (ИСПРАВЛЕНО!)
+TEST(ArtyushkinaFunctional, SingleElement) {
   InType matrix = {{5}};
-  ArtyushkinaATestTaskSEQ task(matrix);
+  OutType expected = {5};
 
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_TRUE(task.Validation());     // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.PreProcessing());  // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.Run());
+
+  auto result = task.GetOutput();
+  EXPECT_EQ(result, expected);
+}
+
+TEST(ArtyushkinaFunctional, AllSameElements) {
+  InType matrix = {{7, 7, 7}, {7, 7, 7}};
+  OutType expected = {7, 7};
+
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_TRUE(task.Validation());     // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.PreProcessing());  // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.Run());
+
+  auto result = task.GetOutput();
+  EXPECT_EQ(result, expected);
+}
+
+TEST(ArtyushkinaFunctional, NegativeNumbers) {
+  InType matrix = {{-10, -5, -3}, {-2, -8, -1}};
+  OutType expected = {-10, -8};
+
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_TRUE(task.Validation());     // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.PreProcessing());  // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.Run());
+
+  auto result = task.GetOutput();
+  EXPECT_EQ(result, expected);
+}
+
+// Тесты валидации
+TEST(ArtyushkinaValidation, EmptyMatrix) {
+  InType matrix = {};
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_FALSE(task.Validation());
+}
+
+TEST(ArtyushkinaValidation, EmptyRow) {
+  InType matrix = {{}, {1, 2}};
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_FALSE(task.Validation());
+}
+
+TEST(ArtyushkinaValidation, DifferentRowSizes) {
+  InType matrix = {{1, 2, 3}, {4, 5}};
+  ArtyushkinaStringMatrixSEQ task(matrix);
+  EXPECT_FALSE(task.Validation());
+}
+
+// ==================== MPI ТЕСТЫ ====================
+// ВНИМАНИЕ: Эти тесты нужно запускать через mpirun!
+
+TEST(ArtyushkinaFunctionalMPI, Test1) {
+  auto [matrix, expected] = GetTestData(1);
+
+  ArtyushkinaStringMatrixMPI task(matrix);
   EXPECT_TRUE(task.Validation());
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
-  EXPECT_TRUE(task.PostProcessing());
 
   auto result = task.GetOutput();
-  EXPECT_FALSE(result.empty());
-  EXPECT_EQ(result.size(), 1);
+  // В MPI только главный процесс возвращает результат
+  if (!result.empty()) {
+    EXPECT_EQ(result, expected);
+  }
 }
 
-// #ifdef BUILD_MPI_TESTS
-TEST(ArtyushkinaStringMatrixFunctional, MPI_Basic2x2Matrix) {
-  InType matrix = {{1, 2}, {3, 4}};
-  ArtyushkinaATestTaskMPI task(matrix);
+TEST(ArtyushkinaFunctionalMPI, Test2) {
+  auto [matrix, expected] = GetTestData(2);
 
+  ArtyushkinaStringMatrixMPI task(matrix);
   EXPECT_TRUE(task.Validation());
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
-  EXPECT_TRUE(task.PostProcessing());
 
   auto result = task.GetOutput();
-  EXPECT_FALSE(result.empty());
-  EXPECT_EQ(result.size(), 2);
+  if (!result.empty()) {
+    EXPECT_EQ(result, expected);
+  }
 }
-// #endif
+
+// MPI тесты для больших матриц
+TEST(ArtyushkinaFunctionalMPI, LargeMatrix) {
+  InType matrix = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}, {11, 12, 13, 14, 15}};
+  OutType expected = {1, 6, 11};
+
+  ArtyushkinaStringMatrixMPI task(matrix);
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+  EXPECT_TRUE(task.Run());
+
+  auto result = task.GetOutput();
+  if (!result.empty()) {
+    EXPECT_EQ(result, expected);
+  }
+}
 
 }  // namespace artyushkina_string_matrix

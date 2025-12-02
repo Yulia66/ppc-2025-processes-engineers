@@ -5,12 +5,12 @@
 
 namespace artyushkina_string_matrix {
 
-class ArtyushkinaATestTaskSEQ : public BaseTask {
+class ArtyushkinaStringMatrixSEQ : public BaseTask {
  public:
   static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
     return ppc::task::TypeOfTask::kSEQ;
   }
-  explicit ArtyushkinaATestTaskSEQ(const InType &in);
+  explicit ArtyushkinaStringMatrixSEQ(const InType &in);
 
  private:
   bool ValidationImpl() override;

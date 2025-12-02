@@ -6,34 +6,48 @@
 
 namespace artyushkina_string_matrix {
 
-ArtyushkinaATestTaskSEQ::ArtyushkinaATestTaskSEQ(const InType &in) {
+ArtyushkinaStringMatrixSEQ::ArtyushkinaStringMatrixSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput() = {};
 }
 
-bool ArtyushkinaATestTaskSEQ::ValidationImpl() {
-  return !GetInput().empty() && !GetInput()[0].empty();
+bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
+  if (GetInput().empty()) {
+    return false;
+  }
+
+  // Проверяем, что все строки имеют одинаковую длину
+  size_t cols = GetInput()[0].size();
+  if (cols == 0) {
+    return false;
+  }
+
+  for (const auto &row : GetInput()) {
+    if (row.size() != cols) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-bool ArtyushkinaATestTaskSEQ::PreProcessingImpl() {
+bool ArtyushkinaStringMatrixSEQ::PreProcessingImpl() {
   GetOutput() = std::vector<int>();
   return true;
 }
 
-bool ArtyushkinaATestTaskSEQ::RunImpl() {
+bool ArtyushkinaStringMatrixSEQ::RunImpl() {
   const auto &matrix = GetInput();
   auto &result = GetOutput();
 
+  result.reserve(matrix.size());
+
   for (const auto &row : matrix) {
-    if (row.empty()) {
-      result.push_back(0);
-      continue;
-    }
-    int min_val = row[0];
-    for (size_t i = 1; i < row.size(); ++i) {
-      if (row[i] < min_val) {
-        min_val = row[i];
+    int min_val = INT_MAX;
+    for (int val : row) {
+      if (val < min_val) {
+        min_val = val;
       }
     }
     result.push_back(min_val);
@@ -42,7 +56,7 @@ bool ArtyushkinaATestTaskSEQ::RunImpl() {
   return true;
 }
 
-bool ArtyushkinaATestTaskSEQ::PostProcessingImpl() {
+bool ArtyushkinaStringMatrixSEQ::PostProcessingImpl() {
   return true;
 }
 

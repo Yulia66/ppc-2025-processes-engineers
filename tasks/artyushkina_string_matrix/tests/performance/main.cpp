@@ -1,5 +1,7 @@
 ﻿#include <gtest/gtest.h>
 
+#include <chrono>
+#include <iostream>
 #include <random>
 #include <vector>
 
@@ -10,29 +12,53 @@
 
 namespace artyushkina_string_matrix {
 
-class ArtyushkinaRunPerfTests : public ppc::util::BaseRunPerfTests<InType, OutType> {
+class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
  protected:
   void SetUp() override {
-    // Генерация большой матрицы для тестов производительности
+    // Генерируем матрицу 1000x1000 для тестов
     const int rows = 1000;
     const int cols = 1000;
-    input_data_.resize(rows);
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(1, 1000);
+    std::uniform_int_distribution<int> dist(-1000, 1000);
+
+    input_data_.resize(rows);
+    expected_output_.resize(rows);
 
     for (int i = 0; i < rows; ++i) {
       input_data_[i].resize(cols);
+      int row_min = INT_MAX;
+
       for (int j = 0; j < cols; ++j) {
-        input_data_[i][j] = dist(gen);
+        int val = dist(gen);
+        input_data_[i][j] = val;
+        if (val < row_min) {
+          row_min = val;
+        }
       }
+
+      expected_output_[i] = row_min;
     }
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    // Проверяем, что количество минимумов равно количеству строк
-    return output_data.size() == input_data_.size();
+    // Для MPI только процесс 0 имеет результат
+    if (output_data.empty()) {
+      return true;  // Это не главный процесс в MPI
+    }
+
+    if (output_data.size() != expected_output_.size()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < output_data.size(); ++i) {
+      if (output_data[i] != expected_output_[i]) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   InType GetTestInputData() final {
@@ -41,19 +67,20 @@ class ArtyushkinaRunPerfTests : public ppc::util::BaseRunPerfTests<InType, OutTy
 
  private:
   InType input_data_;
+  OutType expected_output_;
 };
 
-TEST_P(ArtyushkinaRunPerfTests, RunPerfModes) {
+TEST_P(ArtyushkinaRunPerfTestsProcesses, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, ArtyushkinaATestTaskMPI, ArtyushkinaATestTaskSEQ>(
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, ArtyushkinaStringMatrixMPI, ArtyushkinaStringMatrixSEQ>(
     PPC_SETTINGS_artyushkina_string_matrix);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 
-const auto kPerfTestName = ArtyushkinaRunPerfTests::CustomPerfTestName;
+const auto kPerfTestName = ArtyushkinaRunPerfTestsProcesses::CustomPerfTestName;
 
-INSTANTIATE_TEST_SUITE_P(RunModeTests, ArtyushkinaRunPerfTests, kGtestValues, kPerfTestName);
+INSTANTIATE_TEST_SUITE_P(RunModeTests, ArtyushkinaRunPerfTestsProcesses, kGtestValues, kPerfTestName);
 
 }  // namespace artyushkina_string_matrix

@@ -5,18 +5,22 @@
 
 namespace artyushkina_string_matrix {
 
-class ArtyushkinaATestTaskMPI : public BaseTask {
+class ArtyushkinaStringMatrixMPI : public BaseTask {
  public:
   static constexpr ppc::task::TypeOfTask GetStaticTypeOfTask() {
     return ppc::task::TypeOfTask::kMPI;
   }
-  explicit ArtyushkinaATestTaskMPI(const InType &in);
+  explicit ArtyushkinaStringMatrixMPI(const InType &in);
 
  private:
   bool ValidationImpl() override;
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
+
+  // Вспомогательные методы
+  static std::vector<int> FlattenMatrix(const std::vector<std::vector<int>> &matrix);
+  static std::vector<std::vector<int>> UnflattenMatrix(const std::vector<int> &flat, int rows, int cols);
 };
 
 }  // namespace artyushkina_string_matrix
