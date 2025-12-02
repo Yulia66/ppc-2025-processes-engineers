@@ -1,4 +1,4 @@
-name: 'Setup Windows Toolchain'
+﻿name: 'Setup Windows Toolchain'
 description: 'Configure msbuild, MPI, ccache, ninja, and MSVC'
 runs:
   using: 'composite'

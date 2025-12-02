@@ -1,12 +1,12 @@
 ﻿#include <gtest/gtest.h>
+
+#include <random>
 #include <vector>
+
 #include "artyushkina_string_matrix/common/include/common.hpp"
 #include "artyushkina_string_matrix/mpi/include/ops_mpi.hpp"
 #include "artyushkina_string_matrix/seq/include/ops_seq.hpp"
 #include "util/include/perf_test_util.hpp"
-#include <gtest/gtest.h>
-#include <vector>
-#include <random>
 
 namespace artyushkina_string_matrix {
 
@@ -17,11 +17,11 @@ class ArtyushkinaRunPerfTests : public ppc::util::BaseRunPerfTests<InType, OutTy
     const int rows = 1000;
     const int cols = 1000;
     input_data_.resize(rows);
-    
+
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<int> dist(1, 1000);
-    
+
     for (int i = 0; i < rows; ++i) {
       input_data_[i].resize(cols);
       for (int j = 0; j < cols; ++j) {
@@ -47,9 +47,8 @@ TEST_P(ArtyushkinaRunPerfTests, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks =
-    ppc::util::MakeAllPerfTasks<InType, ArtyushkinaATestTaskMPI, ArtyushkinaATestTaskSEQ>(
-        PPC_SETTINGS_artyushkina_string_matrix);
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, ArtyushkinaATestTaskMPI, ArtyushkinaATestTaskSEQ>(
+    PPC_SETTINGS_artyushkina_string_matrix);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 

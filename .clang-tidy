@@ -1,4 +1,4 @@
-Checks: >
+﻿Checks: >
   bugprone-*,
   cert-dcl50-cpp,
   cert-dcl58-cpp,
