@@ -75,20 +75,18 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
   total_rows = dimensions[0];
   total_cols = dimensions[1];
 
- 
   int rows_per_process = total_rows / size;
   int remainder = total_rows % size;
 
   int my_rows = rows_per_process + (rank < remainder ? 1 : 0);
-  //int my_offset = 0;
-
+  // int my_offset = 0;
 
   int offset = 0;
   for (int i = 0; i < rank; ++i) {
     int rows_for_i = rows_per_process + (i < remainder ? 1 : 0);
     offset += rows_for_i;
   }
- // my_offset = offset;
+  // my_offset = offset;
 
   // Буфер для данных
   std::vector<int> local_data;
