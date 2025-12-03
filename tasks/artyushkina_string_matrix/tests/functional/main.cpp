@@ -8,7 +8,7 @@
 #include "artyushkina_string_matrix/seq/include/ops_seq.hpp"
 
 namespace artyushkina_string_matrix {
-std::pair<InType, OutType> GetTestData(int test_num);
+static std::pair<InType, OutType> GetTestData(int test_num);
 static std::pair<InType, OutType> GetTestData(int test_num) {
   switch (test_num) {
     case 1:
