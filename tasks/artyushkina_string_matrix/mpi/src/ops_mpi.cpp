@@ -9,8 +9,13 @@ namespace artyushkina_string_matrix {
 
 ArtyushkinaStringMatrixMPI::ArtyushkinaStringMatrixMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-  GetInput() = in;
-  GetOutput() = {};
+ 
+  if (!in.empty()) {
+    GetInput() = in;
+  } else {
+    GetInput() = std::vector<std::vector<int>>();
+  }
+  GetOutput() = std::vector<int>();
 }
 
 bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
