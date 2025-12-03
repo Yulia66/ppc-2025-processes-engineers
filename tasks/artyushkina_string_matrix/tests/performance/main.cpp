@@ -15,8 +15,8 @@ namespace artyushkina_string_matrix {
 class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
  protected:
   void SetUp() override {
-    const int rows = 1000;
-    const int cols = 1000;
+    const int rows = 5000;
+    const int cols = 5000;
 
     std::random_device rd;
     std::mt19937 gen(rd());
