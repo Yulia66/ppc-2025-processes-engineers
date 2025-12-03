@@ -1,9 +1,9 @@
 #include "artyushkina_string_matrix/mpi/include/ops_mpi.hpp"
 
+#include <mpi.h>
+
 #include <algorithm>
 #include <climits>
-
-#include "C:/Program Files (x86)/Microsoft SDKs/MPI/Include/mpi.h"
 
 namespace artyushkina_string_matrix {
 
@@ -63,12 +63,10 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
 
   if (rank == 0) {
     if (total_rows < size) {
-      // Если строк меньше, чем процессов, используем только нужное количество процессов
       size = total_rows;
     }
   }
 
-  // Рассылаем размеры матрицы всем процессам
   int dimensions[2] = {total_rows, total_cols};
   MPI_Bcast(dimensions, 2, MPI_INT, 0, MPI_COMM_WORLD);
 
@@ -88,14 +86,11 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
   }
   // my_offset = offset;
 
-  // Буфер для данных
   std::vector<int> local_data;
 
   if (rank == 0) {
-    // Преобразуем матрицу в одномерный массив
     std::vector<int> flat_matrix = FlattenMatrix(matrix);
 
-    // Рассылаем данные всем процессам
     std::vector<int> send_counts(size);
     std::vector<int> displacements(size);
 
@@ -107,22 +102,17 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
       offset += rows_for_i;
     }
 
-    // Выделяем память для локальных данных
     local_data.resize(my_rows * total_cols);
 
-    // Рассылаем данные
     MPI_Scatterv(flat_matrix.data(), send_counts.data(), displacements.data(), MPI_INT, local_data.data(),
                  my_rows * total_cols, MPI_INT, 0, MPI_COMM_WORLD);
   } else {
-    // Выделяем память для локальных данных
     local_data.resize(my_rows * total_cols);
 
-    // Получаем данные от главного процесса
     MPI_Scatterv(nullptr, nullptr, nullptr, MPI_INT, local_data.data(), my_rows * total_cols, MPI_INT, 0,
                  MPI_COMM_WORLD);
   }
 
-  // Локальный поиск минимумов
   std::vector<int> local_minima(my_rows, INT_MAX);
   for (int i = 0; i < my_rows; ++i) {
     for (int j = 0; j < total_cols; ++j) {
@@ -133,13 +123,11 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
     }
   }
 
-  // Собираем результаты
   std::vector<int> global_minima;
   if (rank == 0) {
     global_minima.resize(total_rows);
   }
 
-  // Подготавливаем данные для Gatherv
   std::vector<int> recv_counts(size);
   std::vector<int> displacements_recv(size);
 
@@ -151,11 +139,9 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
     rows_so_far += rows_for_i;
   }
 
-  // Собираем все минимумы на главном процессе
   MPI_Gatherv(local_minima.data(), my_rows, MPI_INT, global_minima.data(), recv_counts.data(),
               displacements_recv.data(), MPI_INT, 0, MPI_COMM_WORLD);
 
-  // Сохраняем результат на главном процессе
   if (rank == 0) {
     GetOutput() = global_minima;
   } else {

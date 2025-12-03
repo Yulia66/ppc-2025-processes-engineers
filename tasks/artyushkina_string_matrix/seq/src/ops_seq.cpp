@@ -17,7 +17,6 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-  // Проверяем, что все строки имеют одинаковую длину
   size_t cols = GetInput()[0].size();
   if (cols == 0) {
     return false;

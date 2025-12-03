@@ -15,7 +15,6 @@ namespace artyushkina_string_matrix {
 class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
  protected:
   void SetUp() override {
-    // Генерируем матрицу 1000x1000 для тестов
     const int rows = 1000;
     const int cols = 1000;
 
@@ -43,9 +42,8 @@ class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InTy
   }
 
   bool CheckTestOutputData(OutType &output_data) final {
-    // Для MPI только процесс 0 имеет результат
     if (output_data.empty()) {
-      return true;  // Это не главный процесс в MPI
+      return true;
     }
 
     if (output_data.size() != expected_output_.size()) {

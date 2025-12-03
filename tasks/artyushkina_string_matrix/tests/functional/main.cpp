@@ -9,7 +9,6 @@
 
 namespace artyushkina_string_matrix {
 
-// Вспомогательная функция для создания матрицы прямо в коде
 std::pair<InType, OutType> GetTestData(int test_num) {
   switch (test_num) {
     case 1:
@@ -75,14 +74,13 @@ TEST(ArtyushkinaFunctional, Test4) {
   EXPECT_EQ(result, expected);
 }
 
-// Дополнительные тесты (ИСПРАВЛЕНО!)
 TEST(ArtyushkinaFunctional, SingleElement) {
   InType matrix = {{5}};
   OutType expected = {5};
 
   ArtyushkinaStringMatrixSEQ task(matrix);
-  EXPECT_TRUE(task.Validation());     // ← ДОБАВЛЕНО
-  EXPECT_TRUE(task.PreProcessing());  // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
   auto result = task.GetOutput();
@@ -94,8 +92,8 @@ TEST(ArtyushkinaFunctional, AllSameElements) {
   OutType expected = {7, 7};
 
   ArtyushkinaStringMatrixSEQ task(matrix);
-  EXPECT_TRUE(task.Validation());     // ← ДОБАВЛЕНО
-  EXPECT_TRUE(task.PreProcessing());  // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
   auto result = task.GetOutput();
@@ -107,8 +105,8 @@ TEST(ArtyushkinaFunctional, NegativeNumbers) {
   OutType expected = {-10, -8};
 
   ArtyushkinaStringMatrixSEQ task(matrix);
-  EXPECT_TRUE(task.Validation());     // ← ДОБАВЛЕНО
-  EXPECT_TRUE(task.PreProcessing());  // ← ДОБАВЛЕНО
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
   auto result = task.GetOutput();
@@ -135,7 +133,6 @@ TEST(ArtyushkinaValidation, DifferentRowSizes) {
 }
 
 // ==================== MPI ТЕСТЫ ====================
-// ВНИМАНИЕ: Эти тесты нужно запускать через mpirun!
 
 TEST(ArtyushkinaFunctionalMPI, Test1) {
   auto [matrix, expected] = GetTestData(1);
@@ -146,7 +143,7 @@ TEST(ArtyushkinaFunctionalMPI, Test1) {
   EXPECT_TRUE(task.Run());
 
   auto result = task.GetOutput();
-  // В MPI только главный процесс возвращает результат
+
   if (!result.empty()) {
     EXPECT_EQ(result, expected);
   }
