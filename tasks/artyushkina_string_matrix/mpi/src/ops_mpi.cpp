@@ -9,7 +9,7 @@ namespace artyushkina_string_matrix {
 
 ArtyushkinaStringMatrixMPI::ArtyushkinaStringMatrixMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
- 
+
   if (!in.empty()) {
     GetInput() = in;
   } else {
