@@ -13,7 +13,7 @@ ArtyushkinaStringMatrixSEQ::ArtyushkinaStringMatrixSEQ(const InType &in) {
 }
 
 bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
-  const auto& input = GetInput();
+  const auto &input = GetInput();
   if (input.empty()) {
     return false;
   }

@@ -26,7 +26,7 @@ std::pair<InType, OutType> GetTestData(int test_num) {
   }
 }
 
-}
+}  // namespace
 
 // ==================== SEQ ТЕСТЫ ====================
 
@@ -38,7 +38,7 @@ TEST(ArtyushkinaFunctional, Test1) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
 
@@ -50,7 +50,7 @@ TEST(ArtyushkinaFunctional, Test2) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
 
@@ -62,7 +62,7 @@ TEST(ArtyushkinaFunctional, Test3) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
 
@@ -74,7 +74,7 @@ TEST(ArtyushkinaFunctional, Test4) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
 
@@ -87,7 +87,7 @@ TEST(ArtyushkinaFunctional, SingleElement) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
 
@@ -100,7 +100,7 @@ TEST(ArtyushkinaFunctional, AllSameElements) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
 
@@ -113,10 +113,9 @@ TEST(ArtyushkinaFunctional, NegativeNumbers) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   EXPECT_EQ(result, expected);
 }
-
 
 TEST(ArtyushkinaValidation, EmptyMatrix) {
   const InType matrix = {};
@@ -146,7 +145,7 @@ TEST(ArtyushkinaFunctionalMPI, Test1) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   if (!result.empty()) {
     EXPECT_EQ(result, expected);
   }
@@ -160,16 +159,14 @@ TEST(ArtyushkinaFunctionalMPI, Test2) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   if (!result.empty()) {
     EXPECT_EQ(result, expected);
   }
 }
 
 TEST(ArtyushkinaFunctionalMPI, LargeMatrix) {
-  const InType matrix = {{1, 2, 3, 4, 5}, 
-                         {6, 7, 8, 9, 10}, 
-                         {11, 12, 13, 14, 15}};
+  const InType matrix = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}, {11, 12, 13, 14, 15}};
   const OutType expected = {1, 6, 11};
 
   ArtyushkinaStringMatrixMPI task(matrix);
@@ -177,7 +174,7 @@ TEST(ArtyushkinaFunctionalMPI, LargeMatrix) {
   EXPECT_TRUE(task.PreProcessing());
   EXPECT_TRUE(task.Run());
 
-  const auto& result = task.GetOutput();
+  const auto &result = task.GetOutput();
   if (!result.empty()) {
     EXPECT_EQ(result, expected);
   }
