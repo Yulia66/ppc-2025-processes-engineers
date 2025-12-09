@@ -8,21 +8,22 @@ namespace artyushkina_string_matrix {
 
 ArtyushkinaStringMatrixSEQ::ArtyushkinaStringMatrixSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-  GetInput() = std::vector<std::vector<int>>(in);  // Явное копирование
-  GetOutput() = std::vector<int>();
+  GetInput() = in;
+  GetOutput().clear();
 }
 
 bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
-  if (GetInput().empty()) {
+  const auto& input = GetInput();
+  if (input.empty()) {
     return false;
   }
 
-  size_t cols = GetInput()[0].size();
+  const size_t cols = input[0].size();
   if (cols == 0) {
     return false;
   }
 
-  for (const auto &row : GetInput()) {
+  for (const auto &row : input) {
     if (row.size() != cols) {
       return false;
     }
@@ -32,7 +33,7 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
 }
 
 bool ArtyushkinaStringMatrixSEQ::PreProcessingImpl() {
-  GetOutput() = std::vector<int>();
+  GetOutput().clear();
   return true;
 }
 
@@ -40,11 +41,12 @@ bool ArtyushkinaStringMatrixSEQ::RunImpl() {
   const auto &matrix = GetInput();
   auto &result = GetOutput();
 
+  result.clear();
   result.reserve(matrix.size());
 
   for (const auto &row : matrix) {
     int min_val = INT_MAX;
-    for (int val : row) {
+    for (const int val : row) {
       if (val < min_val) {
         min_val = val;
       }

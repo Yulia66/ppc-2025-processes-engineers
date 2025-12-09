@@ -19,7 +19,6 @@ class ArtyushkinaStringMatrixMPI : public BaseTask {
   bool PostProcessingImpl() override;
 
   static std::vector<int> FlattenMatrix(const std::vector<std::vector<int>> &matrix);
-  static std::vector<std::vector<int>> UnflattenMatrix(const std::vector<int> &flat, int rows, int cols);
 };
 
 }  // namespace artyushkina_string_matrix

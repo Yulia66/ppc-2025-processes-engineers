@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <utility>
 
 namespace artyushkina_string_matrix {
 
@@ -19,16 +20,17 @@ ArtyushkinaStringMatrixMPI::ArtyushkinaStringMatrixMPI(const InType &in) {
 }
 
 bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
-  if (GetInput().empty()) {
+  const auto& input = GetInput();
+  if (input.empty()) {
     return false;
   }
 
-  size_t cols = GetInput()[0].size();
+  const size_t cols = input[0].size();
   if (cols == 0) {
     return false;
   }
 
-  for (const auto &row : GetInput()) {
+  for (const auto &row : input) {
     if (row.size() != cols) {
       return false;
     }
@@ -38,16 +40,22 @@ bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
 }
 
 bool ArtyushkinaStringMatrixMPI::PreProcessingImpl() {
-  GetOutput() = std::vector<int>();
+  GetOutput().clear();
   return true;
 }
 
-std::vector<int> ArtyushkinaStringMatrixMPI::FlattenMatrix(const std::vector<std::vector<int>> &matrix) {
-  std::vector<int> flat;
-  size_t rows = matrix.size();
-  size_t cols = rows > 0 ? matrix[0].size() : 0;
+std::vector<int> ArtyushkinaStringMatrixMPI::FlattenMatrix(
+    const std::vector<std::vector<int>> &matrix) {
+  if (matrix.empty()) {
+    return {};
+  }
 
+  const size_t rows = matrix.size();
+  const size_t cols = matrix[0].size();
+  
+  std::vector<int> flat;
   flat.reserve(rows * cols);
+  
   for (const auto &row : matrix) {
     flat.insert(flat.end(), row.begin(), row.end());
   }
@@ -56,15 +64,16 @@ std::vector<int> ArtyushkinaStringMatrixMPI::FlattenMatrix(const std::vector<std
 }
 
 bool ArtyushkinaStringMatrixMPI::RunImpl() {
-  int rank, size;
+  int rank = 0;
+  int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
   const auto &matrix = GetInput();
 
-  // Размеры матрицы
+
   int total_rows = static_cast<int>(matrix.size());
-  int total_cols = total_rows > 0 ? static_cast<int>(matrix[0].size()) : 0;
+  int total_cols = (total_rows > 0) ? static_cast<int>(matrix[0].size()) : 0;
 
   if (rank == 0) {
     if (total_rows < size) {
@@ -78,18 +87,18 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
   total_rows = dimensions[0];
   total_cols = dimensions[1];
 
-  int rows_per_process = total_rows / size;
-  int remainder = total_rows % size;
+  const int rows_per_process = total_rows / size;
+  const int remainder = total_rows % size;
 
-  int my_rows = rows_per_process + (rank < remainder ? 1 : 0);
-  // int my_offset = 0;
+  const int my_rows = rows_per_process + ((rank < remainder) ? 1 : 0);
+
 
   int offset = 0;
   for (int i = 0; i < rank; ++i) {
-    int rows_for_i = rows_per_process + (i < remainder ? 1 : 0);
+    const int rows_for_i = rows_per_process + ((i < remainder) ? 1 : 0);
     offset += rows_for_i;
   }
-  // my_offset = offset;
+ 
 
   std::vector<int> local_data;
 
@@ -101,36 +110,38 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
 
     offset = 0;
     for (int i = 0; i < size; ++i) {
-      int rows_for_i = rows_per_process + (i < remainder ? 1 : 0);
+      const int rows_for_i = rows_per_process + ((i < remainder) ? 1 : 0);
       send_counts[i] = rows_for_i * total_cols;
       displacements[i] = offset * total_cols;
       offset += rows_for_i;
     }
 
-    local_data.resize(my_rows * total_cols);
+    local_data.resize(static_cast<size_t>(my_rows) * static_cast<size_t>(total_cols));
 
-    MPI_Scatterv(flat_matrix.data(), send_counts.data(), displacements.data(), MPI_INT, local_data.data(),
-                 my_rows * total_cols, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(flat_matrix.data(), send_counts.data(), displacements.data(), 
+                 MPI_INT, local_data.data(), my_rows * total_cols, MPI_INT, 
+                 0, MPI_COMM_WORLD);
   } else {
-    local_data.resize(my_rows * total_cols);
-
-    MPI_Scatterv(nullptr, nullptr, nullptr, MPI_INT, local_data.data(), my_rows * total_cols, MPI_INT, 0,
-                 MPI_COMM_WORLD);
+    local_data.resize(static_cast<size_t>(my_rows) * static_cast<size_t>(total_cols));
+    
+    MPI_Scatterv(nullptr, nullptr, nullptr, MPI_INT, 
+                 local_data.data(), my_rows * total_cols, MPI_INT, 
+                 0, MPI_COMM_WORLD);
   }
 
-  std::vector<int> local_minima(my_rows, INT_MAX);
+  std::vector<int> local_minima(static_cast<size_t>(my_rows), INT_MAX);
   for (int i = 0; i < my_rows; ++i) {
     for (int j = 0; j < total_cols; ++j) {
-      int val = local_data[i * total_cols + j];
-      if (val < local_minima[i]) {
-        local_minima[i] = val;
+      const int val = local_data[i * total_cols + j];
+      if (val < local_minima[static_cast<size_t>(i)]) {
+        local_minima[static_cast<size_t>(i)] = val;
       }
     }
   }
 
   std::vector<int> global_minima;
   if (rank == 0) {
-    global_minima.resize(total_rows);
+    global_minima.resize(static_cast<size_t>(total_rows));
   }
 
   std::vector<int> recv_counts(size);
@@ -138,19 +149,20 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
 
   int rows_so_far = 0;
   for (int i = 0; i < size; ++i) {
-    int rows_for_i = rows_per_process + (i < remainder ? 1 : 0);
+    const int rows_for_i = rows_per_process + ((i < remainder) ? 1 : 0);
     recv_counts[i] = rows_for_i;
     displacements_recv[i] = rows_so_far;
     rows_so_far += rows_for_i;
   }
 
-  MPI_Gatherv(local_minima.data(), my_rows, MPI_INT, global_minima.data(), recv_counts.data(),
+  MPI_Gatherv(local_minima.data(), my_rows, MPI_INT, 
+              global_minima.data(), recv_counts.data(),
               displacements_recv.data(), MPI_INT, 0, MPI_COMM_WORLD);
 
   if (rank == 0) {
-    GetOutput() = global_minima;
+    GetOutput() = std::move(global_minima);
   } else {
-    GetOutput() = std::vector<int>();
+    GetOutput().clear();
   }
 
   return true;
