@@ -8,8 +8,14 @@ namespace artyushkina_string_matrix {
 
 ArtyushkinaStringMatrixSEQ::ArtyushkinaStringMatrixSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-  GetInput() = in;
-  GetOutput().clear();
+
+  if (!in.empty()) {
+    GetInput() = in;
+  } else {
+    GetInput() = InType{};
+  }
+
+  GetOutput() = OutType{};
 }
 
 bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {

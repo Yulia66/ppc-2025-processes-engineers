@@ -14,11 +14,11 @@ ArtyushkinaStringMatrixMPI::ArtyushkinaStringMatrixMPI(const InType &in) {
   if (!in.empty()) {
     GetInput() = in;
   } else {
-    GetInput() = std::vector<std::vector<int>>();
+    GetInput() = InType{};
   }
-  GetOutput() = std::vector<int>();
-}
 
+  GetOutput() = OutType{};
+}
 bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
   const auto &input = GetInput();
   if (input.empty()) {
