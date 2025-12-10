@@ -12,13 +12,13 @@ class ArtyushkinaStringMatrixMPI : public BaseTask {
   }
   explicit ArtyushkinaStringMatrixMPI(const InType &in);
 
+  static std::vector<int> FlattenMatrix(const std::vector<std::vector<int>> &matrix);
+
  private:
   bool ValidationImpl() override;
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
-
-  static std::vector<int> FlattenMatrix(const std::vector<std::vector<int>> &matrix);
 };
 
 }  // namespace artyushkina_string_matrix
