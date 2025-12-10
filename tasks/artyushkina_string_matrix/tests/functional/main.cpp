@@ -180,4 +180,99 @@ TEST(ArtyushkinaFunctionalMPI, LargeMatrix) {
   }
 }
 
+// ==================== UNIT ТЕСТЫ ====================
+
+TEST(ArtyushkinaUnitTests, SEQ_ConstructorAndValidation) {
+  const InType matrix = {{1, 2, 3}, {4, 5, 6}};
+  ArtyushkinaStringMatrixSEQ task(matrix);
+
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+}
+
+TEST(ArtyushkinaUnitTests, SEQ_InvalidMatrixEmpty) {
+  const InType empty_matrix = {};
+  ArtyushkinaStringMatrixSEQ task(empty_matrix);
+  EXPECT_FALSE(task.Validation());
+}
+
+TEST(ArtyushkinaUnitTests, SEQ_InvalidMatrixJagged) {
+  const InType jagged_matrix = {{1, 2}, {3}};
+  ArtyushkinaStringMatrixSEQ task(jagged_matrix);
+  EXPECT_FALSE(task.Validation());
+}
+
+TEST(ArtyushkinaUnitTests, SEQ_RunAndGetOutput) {
+  const InType matrix = {{1, 2, 3}, {4, 5, 6}};
+  ArtyushkinaStringMatrixSEQ task(matrix);
+
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+  EXPECT_TRUE(task.Run());
+
+  const auto &result = task.GetOutput();
+  EXPECT_EQ(result.size(), 2U);
+  EXPECT_EQ(result[0], 1);
+  EXPECT_EQ(result[1], 4);
+}
+
+TEST(ArtyushkinaUnitTests, SEQ_PostProcessing) {
+  const InType matrix = {{1, 2}};
+  ArtyushkinaStringMatrixSEQ task(matrix);
+
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+  EXPECT_TRUE(task.Run());
+  EXPECT_TRUE(task.PostProcessing());
+}
+
+TEST(ArtyushkinaUnitTests, MPI_ConstructorAndValidation) {
+  const InType matrix = {{1, 2}, {3, 4}};
+  ArtyushkinaStringMatrixMPI task(matrix);
+
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+}
+
+TEST(ArtyushkinaUnitTests, MPI_InvalidMatrix) {
+  const InType empty_matrix = {};
+  ArtyushkinaStringMatrixMPI task(empty_matrix);
+  EXPECT_FALSE(task.Validation());
+}
+
+TEST(ArtyushkinaUnitTests, MPI_FlattenMatrixMethod) {
+  const InType matrix = {{1, 2}, {3, 4}};
+  const auto flat = ArtyushkinaStringMatrixMPI::FlattenMatrix(matrix);
+
+  EXPECT_EQ(flat.size(), 4U);
+  EXPECT_EQ(flat[0], 1);
+  EXPECT_EQ(flat[1], 2);
+  EXPECT_EQ(flat[2], 3);
+  EXPECT_EQ(flat[3], 4);
+}
+
+TEST(ArtyushkinaUnitTests, MPI_FlattenEmptyMatrix) {
+  const InType empty_matrix = {};
+  const auto flat = ArtyushkinaStringMatrixMPI::FlattenMatrix(empty_matrix);
+
+  EXPECT_TRUE(flat.empty());
+}
+
+TEST(ArtyushkinaUnitTests, MPI_PostProcessing) {
+  const InType matrix = {{1, 2}};
+  ArtyushkinaStringMatrixMPI task(matrix);
+
+  EXPECT_TRUE(task.Validation());
+  EXPECT_TRUE(task.PreProcessing());
+  EXPECT_TRUE(task.PostProcessing());
+}
+
+TEST(ArtyushkinaUnitTests, SEQ_GetStaticTypeOfTask) {
+  EXPECT_EQ(ArtyushkinaStringMatrixSEQ::GetStaticTypeOfTask(), ppc::task::TypeOfTask::kSEQ);
+}
+
+TEST(ArtyushkinaUnitTests, MPI_GetStaticTypeOfTask) {
+  EXPECT_EQ(ArtyushkinaStringMatrixMPI::GetStaticTypeOfTask(), ppc::task::TypeOfTask::kMPI);
+}
+
 }  // namespace artyushkina_string_matrix

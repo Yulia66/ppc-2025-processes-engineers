@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "artyushkina_string_matrix/common/include/common.hpp"
 #include "task/include/task.hpp"
 

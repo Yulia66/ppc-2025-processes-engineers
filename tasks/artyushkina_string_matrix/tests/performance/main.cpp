@@ -1,9 +1,6 @@
-﻿#include <gtest/gtest.h>
-
-#include <chrono>
-#include <iostream>
+﻿#include <climits>
+#include <cstddef>
 #include <random>
-#include <vector>
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
 #include "artyushkina_string_matrix/mpi/include/ops_mpi.hpp"
@@ -15,8 +12,10 @@ namespace artyushkina_string_matrix {
 class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InType, OutType> {
  protected:
   void SetUp() override {
-    const int rows = 5000;
-    const int cols = 5000;
+    constexpr int kMatrixSizeRows = 5000;
+    constexpr int kMatrixSizeCols = 5000;
+    const int rows = kMatrixSizeRows;
+    const int cols = kMatrixSizeCols;
 
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -32,9 +31,7 @@ class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InTy
       for (int j = 0; j < cols; ++j) {
         int val = dist(gen);
         input_data_[i][j] = val;
-        if (val < row_min) {
-          row_min = val;
-        }
+        row_min = std::min(val, row_min);
       }
 
       expected_output_[i] = row_min;
@@ -50,7 +47,7 @@ class ArtyushkinaRunPerfTestsProcesses : public ppc::util::BaseRunPerfTests<InTy
       return false;
     }
 
-    for (size_t i = 0; i < output_data.size(); ++i) {
+    for (std::size_t i = 0; i < output_data.size(); ++i) {
       if (output_data[i] != expected_output_[i]) {
         return false;
       }

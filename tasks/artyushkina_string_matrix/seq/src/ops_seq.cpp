@@ -1,7 +1,7 @@
 #include "artyushkina_string_matrix/seq/include/ops_seq.hpp"
 
-#include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <vector>
 
 namespace artyushkina_string_matrix {
@@ -24,7 +24,7 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-  const size_t cols = input[0].size();
+  const std::size_t cols = input[0].size();
   if (cols == 0) {
     return false;
   }
@@ -53,9 +53,7 @@ bool ArtyushkinaStringMatrixSEQ::RunImpl() {
   for (const auto &row : matrix) {
     int min_val = INT_MAX;
     for (const int val : row) {
-      if (val < min_val) {
-        min_val = val;
-      }
+      min_val = std::min(val, min_val);
     }
     result.push_back(min_val);
   }
