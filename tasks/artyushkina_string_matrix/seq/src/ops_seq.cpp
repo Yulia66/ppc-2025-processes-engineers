@@ -1,5 +1,6 @@
 #include "artyushkina_string_matrix/seq/include/ops_seq.hpp"
 
+#include <algorithm>
 #include <climits>
 #include <cstddef>
 #include <vector>
@@ -29,13 +30,7 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-  for (const auto &row : input) {
-    if (row.size() != cols) {
-      return false;
-    }
-  }
-
-  return true;
+  return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
 }
 
 bool ArtyushkinaStringMatrixSEQ::PreProcessingImpl() {

@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
 #include "artyushkina_string_matrix/mpi/include/ops_mpi.hpp"
 #include "artyushkina_string_matrix/seq/include/ops_seq.hpp"
+#include "task/include/task.hpp"
 
 namespace artyushkina_string_matrix {
 
@@ -182,7 +184,7 @@ TEST(ArtyushkinaFunctionalMPI, LargeMatrix) {
 
 // ==================== UNIT ТЕСТЫ ====================
 
-TEST(ArtyushkinaUnitTests, SEQ_ConstructorAndValidation) {
+TEST(ArtyushkinaUnitTests, SEQConstructorAndValidation) {
   const InType matrix = {{1, 2, 3}, {4, 5, 6}};
   ArtyushkinaStringMatrixSEQ task(matrix);
 
@@ -190,19 +192,19 @@ TEST(ArtyushkinaUnitTests, SEQ_ConstructorAndValidation) {
   EXPECT_TRUE(task.PreProcessing());
 }
 
-TEST(ArtyushkinaUnitTests, SEQ_InvalidMatrixEmpty) {
+TEST(ArtyushkinaUnitTests, SEQInvalidMatrixEmpty) {
   const InType empty_matrix = {};
   ArtyushkinaStringMatrixSEQ task(empty_matrix);
   EXPECT_FALSE(task.Validation());
 }
 
-TEST(ArtyushkinaUnitTests, SEQ_InvalidMatrixJagged) {
+TEST(ArtyushkinaUnitTests, SEQInvalidMatrixJagged) {
   const InType jagged_matrix = {{1, 2}, {3}};
   ArtyushkinaStringMatrixSEQ task(jagged_matrix);
   EXPECT_FALSE(task.Validation());
 }
 
-TEST(ArtyushkinaUnitTests, SEQ_RunAndGetOutput) {
+TEST(ArtyushkinaUnitTests, SEQRunAndGetOutput) {
   const InType matrix = {{1, 2, 3}, {4, 5, 6}};
   ArtyushkinaStringMatrixSEQ task(matrix);
 
@@ -216,7 +218,7 @@ TEST(ArtyushkinaUnitTests, SEQ_RunAndGetOutput) {
   EXPECT_EQ(result[1], 4);
 }
 
-TEST(ArtyushkinaUnitTests, SEQ_PostProcessing) {
+TEST(ArtyushkinaUnitTests, SEQPostProcessing) {
   const InType matrix = {{1, 2}};
   ArtyushkinaStringMatrixSEQ task(matrix);
 
@@ -226,7 +228,7 @@ TEST(ArtyushkinaUnitTests, SEQ_PostProcessing) {
   EXPECT_TRUE(task.PostProcessing());
 }
 
-TEST(ArtyushkinaUnitTests, MPI_ConstructorAndValidation) {
+TEST(ArtyushkinaUnitTests, MPIConstructorAndValidation) {
   const InType matrix = {{1, 2}, {3, 4}};
   ArtyushkinaStringMatrixMPI task(matrix);
 
@@ -234,13 +236,13 @@ TEST(ArtyushkinaUnitTests, MPI_ConstructorAndValidation) {
   EXPECT_TRUE(task.PreProcessing());
 }
 
-TEST(ArtyushkinaUnitTests, MPI_InvalidMatrix) {
+TEST(ArtyushkinaUnitTests, MPIInvalidMatrix) {
   const InType empty_matrix = {};
   ArtyushkinaStringMatrixMPI task(empty_matrix);
   EXPECT_FALSE(task.Validation());
 }
 
-TEST(ArtyushkinaUnitTests, MPI_FlattenMatrixMethod) {
+TEST(ArtyushkinaUnitTests, MPIFlattenMatrixMethod) {
   const InType matrix = {{1, 2}, {3, 4}};
   const auto flat = ArtyushkinaStringMatrixMPI::FlattenMatrix(matrix);
 
@@ -251,14 +253,14 @@ TEST(ArtyushkinaUnitTests, MPI_FlattenMatrixMethod) {
   EXPECT_EQ(flat[3], 4);
 }
 
-TEST(ArtyushkinaUnitTests, MPI_FlattenEmptyMatrix) {
+TEST(ArtyushkinaUnitTests, MPIFlattenEmptyMatrix) {
   const InType empty_matrix = {};
   const auto flat = ArtyushkinaStringMatrixMPI::FlattenMatrix(empty_matrix);
 
   EXPECT_TRUE(flat.empty());
 }
 
-TEST(ArtyushkinaUnitTests, MPI_PostProcessing) {
+TEST(ArtyushkinaUnitTests, MPIPostProcessing) {
   const InType matrix = {{1, 2}};
   ArtyushkinaStringMatrixMPI task(matrix);
 
@@ -267,11 +269,11 @@ TEST(ArtyushkinaUnitTests, MPI_PostProcessing) {
   EXPECT_TRUE(task.PostProcessing());
 }
 
-TEST(ArtyushkinaUnitTests, SEQ_GetStaticTypeOfTask) {
+TEST(ArtyushkinaUnitTests, SEQGetStaticTypeOfTask) {
   EXPECT_EQ(ArtyushkinaStringMatrixSEQ::GetStaticTypeOfTask(), ppc::task::TypeOfTask::kSEQ);
 }
 
-TEST(ArtyushkinaUnitTests, MPI_GetStaticTypeOfTask) {
+TEST(ArtyushkinaUnitTests, MPIGetStaticTypeOfTask) {
   EXPECT_EQ(ArtyushkinaStringMatrixMPI::GetStaticTypeOfTask(), ppc::task::TypeOfTask::kMPI);
 }
 

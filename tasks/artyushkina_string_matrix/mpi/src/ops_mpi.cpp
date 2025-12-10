@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 
+#include <algorithm>  // Для std::min и std::all_of (без ranges)
 #include <array>
 #include <climits>
 #include <cstddef>
@@ -33,13 +34,8 @@ bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
     return false;
   }
 
-  for (const auto &row : input) {
-    if (row.size() != cols) {
-      return false;
-    }
-  }
-
-  return true;
+  // Используем std::all_of вместо std::ranges::all_of для совместимости
+  return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
 }
 
 bool ArtyushkinaStringMatrixMPI::PreProcessingImpl() {
