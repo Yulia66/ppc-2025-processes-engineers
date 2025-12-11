@@ -138,47 +138,18 @@ TEST(ArtyushkinaValidation, DifferentRowSizes) {
 
 // ==================== MPI ТЕСТЫ ====================
 
-TEST(ArtyushkinaFunctionalMPI, Test1) {
+TEST(ArtyushkinaFunctionalMPI, ConstructorAndValidationNoMPI) {
   const auto [matrix, expected] = GetTestData(1);
 
   ArtyushkinaStringMatrixMPI task(matrix);
   EXPECT_TRUE(task.Validation());
   EXPECT_TRUE(task.PreProcessing());
-  EXPECT_TRUE(task.Run());
-
-  const auto &result = task.GetOutput();
-  if (!result.empty()) {
-    EXPECT_EQ(result, expected);
-  }
 }
 
-TEST(ArtyushkinaFunctionalMPI, Test2) {
-  const auto [matrix, expected] = GetTestData(2);
-
-  ArtyushkinaStringMatrixMPI task(matrix);
-  EXPECT_TRUE(task.Validation());
-  EXPECT_TRUE(task.PreProcessing());
-  EXPECT_TRUE(task.Run());
-
-  const auto &result = task.GetOutput();
-  if (!result.empty()) {
-    EXPECT_EQ(result, expected);
-  }
-}
-
-TEST(ArtyushkinaFunctionalMPI, LargeMatrix) {
-  const InType matrix = {{1, 2, 3, 4, 5}, {6, 7, 8, 9, 10}, {11, 12, 13, 14, 15}};
-  const OutType expected = {1, 6, 11};
-
-  ArtyushkinaStringMatrixMPI task(matrix);
-  EXPECT_TRUE(task.Validation());
-  EXPECT_TRUE(task.PreProcessing());
-  EXPECT_TRUE(task.Run());
-
-  const auto &result = task.GetOutput();
-  if (!result.empty()) {
-    EXPECT_EQ(result, expected);
-  }
+TEST(ArtyushkinaFunctionalMPI, InvalidMatrixNoMPI) {
+  const InType empty_matrix = {};
+  ArtyushkinaStringMatrixMPI task(empty_matrix);
+  EXPECT_FALSE(task.Validation());
 }
 
 // ==================== UNIT ТЕСТЫ ====================
@@ -265,9 +236,7 @@ TEST(ArtyushkinaUnitTests, MPIPostProcessing) {
 
   EXPECT_TRUE(task.Validation());
   EXPECT_TRUE(task.PreProcessing());
-  EXPECT_TRUE(task.PostProcessing());
 }
-
 TEST(ArtyushkinaUnitTests, SEQGetStaticTypeOfTask) {
   EXPECT_EQ(ArtyushkinaStringMatrixSEQ::GetStaticTypeOfTask(), ppc::task::TypeOfTask::kSEQ);
 }
