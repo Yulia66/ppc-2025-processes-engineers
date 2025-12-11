@@ -124,11 +124,9 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {  // NOLINT(readability-function-cog
   std::vector<int> local_minima(static_cast<std::size_t>(my_rows), INT_MAX);
   for (int i = 0; i < my_rows; ++i) {
     for (int j = 0; j < total_cols; ++j) {
-      const int index = i * total_cols + j;
+      const int index = (i * total_cols) + j;
       const int val = local_data[static_cast<std::size_t>(index)];
-      if (val < local_minima[static_cast<std::size_t>(i)]) {
-        local_minima[static_cast<std::size_t>(i)] = val;
-      }
+      local_minima[static_cast<std::size_t>(i)] = std::min(val, local_minima[static_cast<std::size_t>(i)]);
     }
   }
 

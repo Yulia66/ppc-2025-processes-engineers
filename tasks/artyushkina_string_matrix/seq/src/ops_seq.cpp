@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <climits>
 #include <cstddef>
-#include <ranges>
 #include <vector>
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
