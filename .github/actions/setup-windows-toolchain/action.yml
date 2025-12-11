@@ -16,6 +16,6 @@ runs:
       with:
         windows_compile_environment: msvc
     - name: Setup ninja
-      uses: seanmiddleditch/gha-setup-ninja@v6
+      uses: ashutoshvarma/setup-ninja@v1
     - name: Setup MSVC for Ninja again
       uses: ilammy/msvc-dev-cmd@v1
