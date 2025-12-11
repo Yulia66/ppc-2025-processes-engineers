@@ -2,12 +2,14 @@
 
 #include <mpi.h>
 
-#include <algorithm>  // Для std::min и std::all_of (без ranges)
+#include <algorithm>
 #include <array>
 #include <climits>
 #include <cstddef>
 #include <utility>
 #include <vector>
+
+#include "artyushkina_string_matrix/common/include/common.hpp"
 
 namespace artyushkina_string_matrix {
 
@@ -34,7 +36,7 @@ bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
     return false;
   }
 
-  // Используем std::all_of вместо std::ranges::all_of для совместимости
+  // NOLINTNEXTLINE(modernize-use-ranges)
   return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
 }
 
@@ -61,7 +63,7 @@ std::vector<int> ArtyushkinaStringMatrixMPI::FlattenMatrix(const std::vector<std
   return flat;
 }
 
-bool ArtyushkinaStringMatrixMPI::RunImpl() {
+bool ArtyushkinaStringMatrixMPI::RunImpl() {  // NOLINT(readability-function-cognitive-complexity)
   int rank = 0;
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -115,7 +117,6 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
                  my_rows * total_cols, MPI_INT, 0, MPI_COMM_WORLD);
   } else {
     local_data.resize(static_cast<std::size_t>(my_rows) * static_cast<std::size_t>(total_cols));
-
     MPI_Scatterv(nullptr, nullptr, nullptr, MPI_INT, local_data.data(), my_rows * total_cols, MPI_INT, 0,
                  MPI_COMM_WORLD);
   }
@@ -123,9 +124,11 @@ bool ArtyushkinaStringMatrixMPI::RunImpl() {
   std::vector<int> local_minima(static_cast<std::size_t>(my_rows), INT_MAX);
   for (int i = 0; i < my_rows; ++i) {
     for (int j = 0; j < total_cols; ++j) {
-      const int index = (i * total_cols) + j;
-      const int val = local_data[index];
-      local_minima[static_cast<std::size_t>(i)] = std::min(val, local_minima[static_cast<std::size_t>(i)]);
+      const int index = i * total_cols + j;
+      const int val = local_data[static_cast<std::size_t>(index)];
+      if (val < local_minima[static_cast<std::size_t>(i)]) {
+        local_minima[static_cast<std::size_t>(i)] = val;
+      }
     }
   }
 
