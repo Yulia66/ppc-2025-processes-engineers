@@ -7,10 +7,6 @@
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
 
-#if __cplusplus >= 202002L
-#  include <ranges>
-#endif
-
 namespace artyushkina_string_matrix {
 
 ArtyushkinaStringMatrixSEQ::ArtyushkinaStringMatrixSEQ(const InType &in) {
