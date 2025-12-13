@@ -1,4 +1,4 @@
-﻿ignore:
+ignore:
   - "tasks/**/tests/**"
   - "modules/**/tests/**"
   - "tasks/common/runners/**"

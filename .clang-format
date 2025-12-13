@@ -1,4 +1,4 @@
-﻿Language: Cpp
+Language: Cpp
 Standard: c++20
 BasedOnStyle: Google
 ColumnLimit: 120

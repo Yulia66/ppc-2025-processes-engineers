@@ -1,4 +1,4 @@
-﻿threads:
+threads:
   # Put integer to shift auto date by N days (negative allowed). Default 0.
   seq: 0
   omp: 0

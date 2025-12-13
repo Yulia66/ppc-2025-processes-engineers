@@ -1,4 +1,4 @@
-﻿name: Nightly routine
+name: Nightly routine
 
 on:
   schedule:

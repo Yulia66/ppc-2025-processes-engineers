@@ -1,4 +1,4 @@
-﻿name: 'Update Pre-commit Hooks'
+name: 'Update Pre-commit Hooks'
 description: 'Updates pre-commit hook versions and creates a PR if changes are detected'
 inputs:
   token:

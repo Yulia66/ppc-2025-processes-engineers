@@ -1,4 +1,4 @@
-﻿processes:
+processes:
   semester_total: 70
   tasks:
     - name: mpi_task_1

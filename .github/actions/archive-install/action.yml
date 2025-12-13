@@ -1,4 +1,4 @@
-﻿name: Archive installed package
+name: Archive installed package
 inputs:
   path:
     description: Directory to archive

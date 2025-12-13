@@ -1,4 +1,4 @@
-﻿threads:
+threads:
   copying:
     seq:
       - example_threads

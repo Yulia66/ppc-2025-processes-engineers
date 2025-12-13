@@ -1,4 +1,4 @@
-﻿"task:all":
+"task:all":
   - changed-files:
       - any-glob-to-any-file:
           - "tasks/**/all"

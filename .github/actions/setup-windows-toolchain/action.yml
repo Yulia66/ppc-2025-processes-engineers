@@ -1,4 +1,4 @@
-﻿name: 'Setup Windows Toolchain'
+name: 'Setup Windows Toolchain'
 description: 'Configure msbuild, MPI, ccache, ninja, and MSVC'
 runs:
   using: 'composite'
@@ -15,16 +15,7 @@ runs:
       uses: Chocobo1/setup-ccache-action@v1
       with:
         windows_compile_environment: msvc
-    - name: Setup ninja manually
-      shell: pwsh
-      run: |
-        # Проверяем, установлен ли уже ninja
-        if (!(Get-Command ninja -ErrorAction SilentlyContinue)) {
-          Write-Host "Installing Ninja via Chocolatey..."
-          choco install ninja -y --no-progress
-          Write-Host "Ninja installed successfully via Chocolatey"
-        } else {
-          Write-Host "Ninja already installed"
-        }
+    - name: Setup ninja
+      uses: seanmiddleditch/gha-setup-ninja@v6
     - name: Setup MSVC for Ninja again
       uses: ilammy/msvc-dev-cmd@v1

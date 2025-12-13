@@ -1,4 +1,4 @@
-﻿name: 'Native Clang-Tidy Analysis'
+name: 'Native Clang-Tidy Analysis'
 description: 'Run clang-tidy analysis without Docker'
 inputs:
   build_dir:
