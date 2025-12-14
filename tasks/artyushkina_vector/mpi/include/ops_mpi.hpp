@@ -17,13 +17,20 @@ class VerticalStripMatVecMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
-
-  void DistributeVectorColumns(int world_size, int base, int rem, std::vector<double> &local_vector, int rank,
-                               int matrix_cols);
-  void ComputeLocalStrip(const std::vector<double> &matrix_flat, const std::vector<double> &local_vector,
-                         std::vector<double> &partial_result, int rows, int cols, int local_width, int local_start);
-  void CollectResults(int world_size, int rank, int rows, int base, int rem, const std::vector<double> &partial_result,
-                      int local_width, int local_start, std::vector<double> &final_result);
+  
+  // Вспомогательные методы
+  void DistributeVectorColumns(int world_size, int base, int rem,
+                               std::vector<double> &local_vector,
+                               int rank, int matrix_cols, int local_width);  // Добавил local_width
+  void ComputeLocalStrip(const std::vector<double> &matrix_flat,
+                         const std::vector<double> &local_vector,
+                         std::vector<double> &partial_result,
+                         int rows, int cols, int local_width, int local_start);
+  void CollectResults(int world_size, int rank, int rows,
+                      int base, int rem,
+                      const std::vector<double> &partial_result,
+                      int local_width, int local_start,
+                      std::vector<double> &final_result);
 };
 
 }  // namespace artyushkina_vector

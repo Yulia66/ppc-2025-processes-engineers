@@ -22,12 +22,14 @@ bool VerticalStripMatVecSEQ::ValidationImpl() {
   size_t cols = matrix[0].size();
   size_t vec_size = vector.size();
 
+  // Проверка прямоугольности матрицы
   for (size_t i = 1; i < rows; ++i) {
     if (matrix[i].size() != cols) {
       return false;
     }
   }
 
+  // Размер вектора должен совпадать с количеством столбцов матрицы
   return vec_size == cols;
 }
 
@@ -38,12 +40,18 @@ bool VerticalStripMatVecSEQ::PreProcessingImpl() {
 
 bool VerticalStripMatVecSEQ::RunImpl() {
   const auto &[matrix, vector] = GetInput();
-
+  
+  if (matrix.empty() || vector.empty()) {
+    GetOutput() = Vector{};
+    return true;
+  }
+  
   size_t rows = matrix.size();
   size_t cols = matrix[0].size();
-
+  
   Vector result(rows, 0.0);
 
+  // Классическое умножение матрицы на вектор
   for (size_t i = 0; i < rows; ++i) {
     double sum = 0.0;
     for (size_t j = 0; j < cols; ++j) {
