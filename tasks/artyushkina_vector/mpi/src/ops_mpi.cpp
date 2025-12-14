@@ -54,8 +54,7 @@ bool VerticalStripMatVecMPI::PreProcessingImpl() {
 
 void VerticalStripMatVecMPI::DistributeVectorColumns(int world_size, int base, int rem,
                                                      std::vector<double> &local_vector, int rank, int /* matrix_cols */,
-                                                     int local_width) {  // Добавил local_width
-
+                                                     int local_width) {
   const int vector_tag = 201;
 
   if (rank == 0) {
@@ -75,10 +74,14 @@ void VerticalStripMatVecMPI::DistributeVectorColumns(int world_size, int base, i
       }
 
       if (proc_width <= 0) {
+        // Отправляем пустое сообщение
+        if (proc != 0) {
+          MPI_Send(nullptr, 0, MPI_DOUBLE, proc, vector_tag, MPI_COMM_WORLD);
+        }
         continue;
       }
 
-      std::vector<double> send_buf(proc_width);
+      std::vector<double> send_buf(static_cast<size_t>(proc_width));
       for (int j = 0; j < proc_width; ++j) {
         int global_col = proc_start + j;
         send_buf[j] = full_vector[global_col];
@@ -91,12 +94,18 @@ void VerticalStripMatVecMPI::DistributeVectorColumns(int world_size, int base, i
       }
     }
   } else if (local_width > 0) {
-    // Обеспечиваем что вектор имеет правильный размер
-    if (local_vector.size() != static_cast<size_t>(local_width)) {
-      local_vector.resize(local_width);
-    }
-    if (!local_vector.empty()) {
-      MPI_Recv(local_vector.data(), local_width, MPI_DOUBLE, 0, vector_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    // Гарантируем что вектор имеет правильный размер
+    local_vector.resize(static_cast<size_t>(local_width));
+    MPI_Recv(local_vector.data(), local_width, MPI_DOUBLE, 0, vector_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  } else {
+    // Получаем пустое сообщение если local_width == 0
+    MPI_Status status;
+    MPI_Probe(0, vector_tag, MPI_COMM_WORLD, &status);
+    int count = 0;
+    MPI_Get_count(&status, MPI_DOUBLE, &count);
+    if (count > 0) {
+      std::vector<double> dummy(static_cast<size_t>(count));
+      MPI_Recv(dummy.data(), count, MPI_DOUBLE, 0, vector_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
   }
 }
@@ -105,17 +114,8 @@ void VerticalStripMatVecMPI::ComputeLocalStrip(const std::vector<double> &matrix
                                                const std::vector<double> &local_vector,
                                                std::vector<double> &partial_result, int rows, int cols, int local_width,
                                                int local_start) {
-  // Добавляем проверки на пустые векторы
-  if (matrix_flat.empty() || local_vector.empty() || partial_result.empty()) {
-    return;
-  }
-
-  if (local_width <= 0) {
-    return;
-  }
-
-  // Проверяем что индексы в пределах
-  if (local_start + local_width > cols) {
+  // Если нет локальных данных, ничего не вычисляем
+  if (local_width <= 0 || local_vector.empty() || partial_result.empty()) {
     return;
   }
 
@@ -126,17 +126,7 @@ void VerticalStripMatVecMPI::ComputeLocalStrip(const std::vector<double> &matrix
     // Для каждого локального столбца
     for (int local_j = 0; local_j < local_width; ++local_j) {
       int global_j = local_start + local_j;
-      // Дополнительная проверка индексов
-      if (global_j >= cols) {
-        break;
-      }
-
-      size_t matrix_idx = static_cast<size_t>(i) * cols + global_j;
-      if (matrix_idx >= matrix_flat.size()) {
-        break;
-      }
-
-      double matrix_val = matrix_flat[matrix_idx];
+      double matrix_val = matrix_flat[i * cols + global_j];
       double vector_val = local_vector[local_j];
       sum += matrix_val * vector_val;
     }
@@ -152,8 +142,8 @@ void VerticalStripMatVecMPI::CollectResults(int world_size, int rank, int rows, 
 
   if (rank == 0) {
     // Сначала сохраняем свой частичный результат
-    if (!partial_result.empty()) {
-      for (int i = 0; i < rows && i < static_cast<int>(partial_result.size()); ++i) {
+    if (local_width > 0 && !partial_result.empty()) {
+      for (int i = 0; i < rows; ++i) {
         final_result[i] = partial_result[i];
       }
     }
@@ -166,10 +156,19 @@ void VerticalStripMatVecMPI::CollectResults(int world_size, int rank, int rows, 
       }
 
       if (proc_width <= 0) {
+        // Получаем пустое сообщение
+        MPI_Status status;
+        MPI_Probe(proc, result_tag, MPI_COMM_WORLD, &status);
+        int count = 0;
+        MPI_Get_count(&status, MPI_DOUBLE, &count);
+        if (count > 0) {
+          std::vector<double> dummy(static_cast<size_t>(count));
+          MPI_Recv(dummy.data(), count, MPI_DOUBLE, proc, result_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
         continue;
       }
 
-      std::vector<double> recv_buf(rows);
+      std::vector<double> recv_buf(static_cast<size_t>(rows));
       MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, result_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
       // Суммируем результаты
@@ -177,9 +176,14 @@ void VerticalStripMatVecMPI::CollectResults(int world_size, int rank, int rows, 
         final_result[i] += recv_buf[i];
       }
     }
-  } else if (local_width > 0 && !partial_result.empty()) {
+  } else if (local_width > 0) {
     // Отправляем свой частичный результат процессу 0
-    MPI_Send(partial_result.data(), rows, MPI_DOUBLE, 0, result_tag, MPI_COMM_WORLD);
+    if (!partial_result.empty()) {
+      MPI_Send(partial_result.data(), rows, MPI_DOUBLE, 0, result_tag, MPI_COMM_WORLD);
+    } else {
+      // Отправляем пустое сообщение
+      MPI_Send(nullptr, 0, MPI_DOUBLE, 0, result_tag, MPI_COMM_WORLD);
+    }
   }
 }
 
@@ -203,7 +207,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   // Проверка валидности размеров
   if (rows <= 0 || cols <= 0) {
-    GetOutput() = Vector(rows, 0.0);
+    GetOutput() = Vector(static_cast<size_t>(rows), 0.0);
     return true;
   }
 
@@ -214,18 +218,16 @@ bool VerticalStripMatVecMPI::RunImpl() {
   int local_width = base + (rank < rem ? 1 : 0);
 
   // Подготовка локальных данных
-  std::vector<double> matrix_flat;
+  std::vector<double> matrix_flat(static_cast<size_t>(rows) * static_cast<size_t>(cols));
   std::vector<double> local_vector;
   std::vector<double> partial_result;
   std::vector<double> final_result;
 
-  // Инициализируем векторы с правильными размерами
+  // Инициализируем векторы только если есть данные для обработки
   if (local_width > 0) {
-    local_vector.resize(local_width);
-    partial_result.resize(rows, 0.0);
+    local_vector.resize(static_cast<size_t>(local_width));
+    partial_result.resize(static_cast<size_t>(rows), 0.0);
   }
-
-  matrix_flat.resize(static_cast<size_t>(rows) * static_cast<size_t>(cols));
 
   // Процесс 0 инициализирует матрицу
   if (rank == 0) {
@@ -238,21 +240,19 @@ bool VerticalStripMatVecMPI::RunImpl() {
   }
 
   // Распространение матрицы
-  if (!matrix_flat.empty()) {
-    MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  }
+  MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   // Распределение частей вектора
   DistributeVectorColumns(world_size, base, rem, local_vector, rank, cols, local_width);
 
   // Локальное вычисление
-  if (local_width > 0 && !matrix_flat.empty() && !local_vector.empty() && !partial_result.empty()) {
+  if (local_width > 0) {
     ComputeLocalStrip(matrix_flat, local_vector, partial_result, rows, cols, local_width, local_start);
   }
 
   // Сбор результатов
   if (rank == 0) {
-    final_result.resize(rows, 0.0);
+    final_result.resize(static_cast<size_t>(rows), 0.0);
   }
 
   CollectResults(world_size, rank, rows, base, rem, partial_result, local_width, local_start, final_result);
@@ -263,15 +263,11 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
     // Отправляем результат другим процессам
     for (int proc = 1; proc < world_size; ++proc) {
-      if (!final_result.empty()) {
-        MPI_Send(final_result.data(), rows, MPI_DOUBLE, proc, 203, MPI_COMM_WORLD);
-      }
+      MPI_Send(final_result.data(), rows, MPI_DOUBLE, proc, 203, MPI_COMM_WORLD);
     }
   } else {
-    Vector result(rows);
-    if (rows > 0) {
-      MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 203, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
+    Vector result(static_cast<size_t>(rows));
+    MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 203, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     GetOutput() = result;
   }
 
