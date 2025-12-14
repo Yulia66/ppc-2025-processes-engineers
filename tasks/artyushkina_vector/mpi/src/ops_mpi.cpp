@@ -52,16 +52,15 @@ bool VerticalStripMatVecMPI::PreProcessingImpl() {
   return true;
 }
 
-void VerticalStripMatVecMPI::DistributeVectorColumns(
-    int world_size, int base, int rem,
-    std::vector<double> &local_vector,
-    int rank, int /* matrix_cols */, int local_width) {  // Добавил local_width
-  
+void VerticalStripMatVecMPI::DistributeVectorColumns(int world_size, int base, int rem,
+                                                     std::vector<double> &local_vector, int rank, int /* matrix_cols */,
+                                                     int local_width) {  // Добавил local_width
+
   const int vector_tag = 201;
 
   if (rank == 0) {
     const auto &[matrix, full_vector] = GetInput();
-    
+
     for (int proc = 0; proc < world_size; ++proc) {
       int proc_start = proc * base;
       if (proc < rem) {
@@ -75,7 +74,9 @@ void VerticalStripMatVecMPI::DistributeVectorColumns(
         proc_width += 1;
       }
 
-      if (proc_width <= 0) continue;
+      if (proc_width <= 0) {
+        continue;
+      }
 
       std::vector<double> send_buf(proc_width);
       for (int j = 0; j < proc_width; ++j) {
@@ -86,8 +87,7 @@ void VerticalStripMatVecMPI::DistributeVectorColumns(
       if (proc == 0) {
         local_vector = std::move(send_buf);
       } else {
-        MPI_Send(send_buf.data(), proc_width, MPI_DOUBLE, 
-                 proc, vector_tag, MPI_COMM_WORLD);
+        MPI_Send(send_buf.data(), proc_width, MPI_DOUBLE, proc, vector_tag, MPI_COMM_WORLD);
       }
     }
   } else if (local_width > 0) {
@@ -96,23 +96,20 @@ void VerticalStripMatVecMPI::DistributeVectorColumns(
       local_vector.resize(local_width);
     }
     if (!local_vector.empty()) {
-      MPI_Recv(local_vector.data(), local_width, MPI_DOUBLE,
-               0, vector_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(local_vector.data(), local_width, MPI_DOUBLE, 0, vector_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
   }
 }
 
-void VerticalStripMatVecMPI::ComputeLocalStrip(
-    const std::vector<double> &matrix_flat,
-    const std::vector<double> &local_vector,
-    std::vector<double> &partial_result,
-    int rows, int cols, int local_width, int local_start) {
-  
+void VerticalStripMatVecMPI::ComputeLocalStrip(const std::vector<double> &matrix_flat,
+                                               const std::vector<double> &local_vector,
+                                               std::vector<double> &partial_result, int rows, int cols, int local_width,
+                                               int local_start) {
   // Добавляем проверки на пустые векторы
   if (matrix_flat.empty() || local_vector.empty() || partial_result.empty()) {
     return;
   }
-  
+
   if (local_width <= 0) {
     return;
   }
@@ -125,32 +122,32 @@ void VerticalStripMatVecMPI::ComputeLocalStrip(
   // Для каждого элемента результата
   for (int i = 0; i < rows; ++i) {
     double sum = 0.0;
-    
+
     // Для каждого локального столбца
     for (int local_j = 0; local_j < local_width; ++local_j) {
       int global_j = local_start + local_j;
       // Дополнительная проверка индексов
-      if (global_j >= cols) break;
-      
+      if (global_j >= cols) {
+        break;
+      }
+
       size_t matrix_idx = static_cast<size_t>(i) * cols + global_j;
-      if (matrix_idx >= matrix_flat.size()) break;
-      
+      if (matrix_idx >= matrix_flat.size()) {
+        break;
+      }
+
       double matrix_val = matrix_flat[matrix_idx];
       double vector_val = local_vector[local_j];
       sum += matrix_val * vector_val;
     }
-    
+
     partial_result[i] = sum;
   }
 }
 
-void VerticalStripMatVecMPI::CollectResults(
-    int world_size, int rank, int rows,
-    int base, int rem,
-    const std::vector<double> &partial_result,
-    int local_width, int /* local_start */,
-    std::vector<double> &final_result) {
-  
+void VerticalStripMatVecMPI::CollectResults(int world_size, int rank, int rows, int base, int rem,
+                                            const std::vector<double> &partial_result, int local_width,
+                                            int /* local_start */, std::vector<double> &final_result) {
   const int result_tag = 202;
 
   if (rank == 0) {
@@ -168,11 +165,12 @@ void VerticalStripMatVecMPI::CollectResults(
         proc_width += 1;
       }
 
-      if (proc_width <= 0) continue;
+      if (proc_width <= 0) {
+        continue;
+      }
 
       std::vector<double> recv_buf(rows);
-      MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE,
-               proc, result_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, result_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
       // Суммируем результаты
       for (int i = 0; i < rows; ++i) {
@@ -181,8 +179,7 @@ void VerticalStripMatVecMPI::CollectResults(
     }
   } else if (local_width > 0 && !partial_result.empty()) {
     // Отправляем свой частичный результат процессу 0
-    MPI_Send(partial_result.data(), rows, MPI_DOUBLE,
-             0, result_tag, MPI_COMM_WORLD);
+    MPI_Send(partial_result.data(), rows, MPI_DOUBLE, 0, result_tag, MPI_COMM_WORLD);
   }
 }
 
@@ -227,7 +224,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
     local_vector.resize(local_width);
     partial_result.resize(rows, 0.0);
   }
-  
+
   matrix_flat.resize(static_cast<size_t>(rows) * static_cast<size_t>(cols));
 
   // Процесс 0 инициализирует матрицу
@@ -250,8 +247,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   // Локальное вычисление
   if (local_width > 0 && !matrix_flat.empty() && !local_vector.empty() && !partial_result.empty()) {
-    ComputeLocalStrip(matrix_flat, local_vector, partial_result, 
-                      rows, cols, local_width, local_start);
+    ComputeLocalStrip(matrix_flat, local_vector, partial_result, rows, cols, local_width, local_start);
   }
 
   // Сбор результатов
@@ -259,25 +255,22 @@ bool VerticalStripMatVecMPI::RunImpl() {
     final_result.resize(rows, 0.0);
   }
 
-  CollectResults(world_size, rank, rows, base, rem, 
-                 partial_result, local_width, local_start, final_result);
+  CollectResults(world_size, rank, rows, base, rem, partial_result, local_width, local_start, final_result);
 
   // Распространение финального результата
   if (rank == 0) {
     GetOutput() = final_result;
-    
+
     // Отправляем результат другим процессам
     for (int proc = 1; proc < world_size; ++proc) {
       if (!final_result.empty()) {
-        MPI_Send(final_result.data(), rows, MPI_DOUBLE, 
-                 proc, 203, MPI_COMM_WORLD);
+        MPI_Send(final_result.data(), rows, MPI_DOUBLE, proc, 203, MPI_COMM_WORLD);
       }
     }
   } else {
     Vector result(rows);
     if (rows > 0) {
-      MPI_Recv(result.data(), rows, MPI_DOUBLE, 
-               0, 203, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 203, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
     GetOutput() = result;
   }

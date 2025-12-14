@@ -40,15 +40,15 @@ bool VerticalStripMatVecSEQ::PreProcessingImpl() {
 
 bool VerticalStripMatVecSEQ::RunImpl() {
   const auto &[matrix, vector] = GetInput();
-  
+
   if (matrix.empty() || vector.empty()) {
     GetOutput() = Vector{};
     return true;
   }
-  
+
   size_t rows = matrix.size();
   size_t cols = matrix[0].size();
-  
+
   Vector result(rows, 0.0);
 
   // Классическое умножение матрицы на вектор
