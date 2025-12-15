@@ -8,6 +8,7 @@
 
 namespace artyushkina_vector {
 
+// Убираем const!
 using Matrix = std::vector<std::vector<double>>;
 using Vector = std::vector<double>;
 using InType = std::pair<Matrix, Vector>;
