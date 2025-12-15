@@ -8,10 +8,13 @@ namespace artyushkina_vector {
 VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
 
-  // Полностью избегаем декомпозиции
-  std::pair<Matrix, Vector> &input = GetInput();
-  input.first = in.first;
-  input.second = in.second;
+  // ИСПРАВЛЕНО: Используем безопасное копирование
+  Matrix matrix_copy = in.first;
+  Vector vector_copy = in.second;
+
+  // Присваиваем через move
+  GetInput().first = std::move(matrix_copy);
+  GetInput().second = std::move(vector_copy);
 
   GetOutput() = Vector{};  // Явно создаем пустой вектор
 }

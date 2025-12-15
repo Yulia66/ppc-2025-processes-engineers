@@ -21,8 +21,13 @@ namespace artyushkina_vector {
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
 
-  // Простая инициализация без декомпозиции
-  GetInput() = in;
+  // ИСПРАВЛЕНО: Используем безопасное копирование
+  Matrix matrix_copy = in.first;
+  Vector vector_copy = in.second;
+
+  // Присваиваем через move
+  GetInput().first = std::move(matrix_copy);
+  GetInput().second = std::move(vector_copy);
 
   GetOutput() = OutType{};
 }
