@@ -16,6 +16,12 @@
 #  pragma warning(pop)
 #endif
 
+// Для GCC отключим предупреждение о потенциальном разыменовании нулевого указателя
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
+
 namespace artyushkina_vector {
 
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
@@ -197,7 +203,11 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   // Если процессоров больше чем столбцов
   if (world_size > cols) {
-    Vector result(rows, 0.0);
+    // ИСПРАВЛЕНО: Безопасное создание вектора
+    Vector result;
+    if (rows > 0) {
+      result.resize(rows, 0.0);
+    }
 
     if (rank == 0) {
       const auto &[matrix, vector] = GetInput();
@@ -212,7 +222,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
       for (int proc = 1; proc < world_size; ++proc) {
         MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 100, MPI_COMM_WORLD);
       }
-    } else {
+    } else if (rows > 0) {
       MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
@@ -226,14 +236,29 @@ bool VerticalStripMatVecMPI::RunImpl() {
   int my_start = 0, my_width = 0;
   GetProcessParams(rank, base, rem, my_start, my_width);
 
-  // Подготовка данных
-  std::vector<double> matrix_flat(rows * cols, 0.0);
-  Vector local_vector(my_width, 0.0);
-  Vector local_result(rows, 0.0);
-  Vector final_result(rows, 0.0);
+  // ИСПРАВЛЕНО: Безопасная подготовка данных
+  std::vector<double> matrix_flat;
+  if (rows > 0 && cols > 0) {
+    matrix_flat.resize(rows * cols, 0.0);
+  }
+
+  Vector local_vector;
+  if (my_width > 0) {
+    local_vector.resize(my_width, 0.0);
+  }
+
+  Vector local_result;
+  if (rows > 0) {
+    local_result.resize(rows, 0.0);
+  }
+
+  Vector final_result;
+  if (rows > 0) {
+    final_result.resize(rows, 0.0);
+  }
 
   // Процесс 0 инициализирует матрицу и распределяет вектор
-  if (rank == 0) {
+  if (rank == 0 && rows > 0 && cols > 0) {
     const auto &[matrix, vector] = GetInput();
 
     // Преобразуем матрицу в плоский массив
@@ -245,26 +270,32 @@ bool VerticalStripMatVecMPI::RunImpl() {
   }
 
   // Распространяем матрицу
-  MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  if (rows > 0 && cols > 0) {
+    MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  }
 
   // Распределяем полосы вектора
   DistributeVectorStripes(world_size, rank == 0 ? GetInput().second : Vector{}, base, rem, local_vector, rank,
                           my_width);
 
   // Локальные вычисления
-  if (my_width > 0) {
+  if (my_width > 0 && rows > 0 && cols > 0) {
     MultiplyStrip(matrix_flat, local_vector, local_result, rows, cols, my_width, my_start);
   }
 
   // Сбор и распространение результатов
   if (rank == 0) {
     GatherResultsInRoot(world_size, rows, base, rem, local_result, final_result);
-  } else {
+  } else if (rows > 0) {
     MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, 102, MPI_COMM_WORLD);
   }
 
   // Распространяем финальный результат
-  Vector local_final_result(rows, 0.0);
+  Vector local_final_result;
+  if (rows > 0) {
+    local_final_result.resize(rows, 0.0);
+  }
+
   if (rank == 0) {
     BroadcastFinalResult(rank, world_size, final_result, local_final_result);
     GetOutput() = final_result;
@@ -281,3 +312,7 @@ bool VerticalStripMatVecMPI::PostProcessingImpl() {
 }
 
 }  // namespace artyushkina_vector
+
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif

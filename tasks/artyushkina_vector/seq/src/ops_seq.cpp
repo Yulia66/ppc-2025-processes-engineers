@@ -3,6 +3,12 @@
 #include <cstddef>
 #include <vector>
 
+// Для GCC отключим предупреждение о потенциальном разыменовании нулевого указателя
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wnull-dereference"
+#endif
+
 namespace artyushkina_vector {
 
 VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
@@ -16,7 +22,7 @@ VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
   GetInput().first = std::move(matrix_copy);
   GetInput().second = std::move(vector_copy);
 
-  GetOutput() = Vector{};  // Явно создаем пустой вектор
+  GetOutput() = Vector{};
 }
 
 bool VerticalStripMatVecSEQ::ValidationImpl() {
@@ -57,7 +63,10 @@ bool VerticalStripMatVecSEQ::RunImpl() {
   size_t rows = matrix.size();
   size_t cols = matrix[0].size();
 
-  Vector result(rows, 0.0);
+  Vector result;
+  if (rows > 0) {
+    result.resize(rows, 0.0);
+  }
 
   // Классическое умножение матрицы на вектор
   for (size_t i = 0; i < rows; ++i) {
@@ -77,3 +86,7 @@ bool VerticalStripMatVecSEQ::PostProcessingImpl() {
 }
 
 }  // namespace artyushkina_vector
+
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
+#endif
