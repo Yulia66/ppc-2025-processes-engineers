@@ -34,7 +34,6 @@ class VerticalStripMatVecFuncTests : public ppc::util::BaseRunFuncTests<InType, 
     const auto &matrix = std::get<1>(params);
     const auto &vector = std::get<2>(params);
 
-    // Просто копируем данные (оригинальные типы)
     input_data_ = std::make_pair(matrix, vector);
     expected_ = std::get<3>(params);
   }
@@ -69,16 +68,19 @@ TestType CreateVectorTest(int test_id, int rows, int cols) {
   Vector vector(cols);
   Vector result(rows, 0.0);
 
+  // Заполняем матрицу последовательными числами
   for (int i = 0; i < rows; ++i) {
     for (int j = 0; j < cols; ++j) {
       matrix[i][j] = (i * cols) + j + 1;
     }
   }
 
+  // Заполняем вектор последовательными числами
   for (int j = 0; j < cols; ++j) {
     vector[j] = j + 1;
   }
 
+  // Вычисляем ожидаемый результат
   for (int i = 0; i < rows; ++i) {
     double sum = 0.0;
     for (int j = 0; j < cols; ++j) {
@@ -95,15 +97,16 @@ const std::array<TestType, 7> kTestParam = {
 
     std::make_tuple(2, Matrix{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, Vector{2, 3, 4}, Vector{2, 3, 4}),
 
-    CreateVectorTest(3, 2, 3),
+    CreateVectorTest(3, 2, 3),  // 2x3 матрица на 3-элементный вектор
 
-    CreateVectorTest(4, 4, 2),
+    CreateVectorTest(4, 4, 2),  // 4x2 матрица на 2-элементный вектор
 
-    std::make_tuple(5, Matrix{{0, 0, 0}, {0, 0, 0}}, Vector{1, 2, 3}, Vector{0, 0}),
+    std::make_tuple(5, Matrix{{0, 0, 0}, {0, 0, 0}}, Vector{1, 2, 3}, Vector{0, 0}),  // Нулевая матрица
 
-    std::make_tuple(6, Matrix{{2.5}}, Vector{3.0}, Vector{7.5}),
+    std::make_tuple(6, Matrix{{2.5}}, Vector{3.0}, Vector{7.5}),  // 1x1 матрица
 
-    CreateVectorTest(7, 1, 5)};
+    CreateVectorTest(7, 1, 5)  // 1x5 матрица на 5-элементный вектор
+};
 
 TEST_P(VerticalStripMatVecFuncTests, MatrixVectorMultiplication) {
   ExecuteTest(GetParam());

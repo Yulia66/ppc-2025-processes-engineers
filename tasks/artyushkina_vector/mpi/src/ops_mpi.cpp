@@ -1,16 +1,31 @@
 #include "artyushkina_vector/mpi/include/ops_mpi.hpp"
 
+// Отключить предупреждение C4100 (неиспользуемые параметры) для MSVC
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4100)  // unreferenced formal parameter
+#endif
+
 #include <mpi.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <vector>
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 namespace artyushkina_vector {
 
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-  // Используем move семантику
-  GetInput().first = std::move(in.first);
-  GetInput().second = std::move(in.second);
+
+  // Простое копирование входных данных
+  auto &[matrix, vector] = GetInput();
+  matrix = in.first;
+  vector = in.second;
+
   GetOutput() = OutType{};
 }
 
@@ -29,18 +44,129 @@ bool VerticalStripMatVecMPI::ValidationImpl() {
   }
 
   size_t cols = matrix[0].size();
+
+  // Проверяем, что матрица прямоугольная
   for (size_t i = 1; i < matrix.size(); ++i) {
     if (matrix[i].size() != cols) {
       return false;
     }
   }
 
+  // Количество столбцов матрицы должно совпадать с размером вектора
   return vector.size() == cols;
 }
 
 bool VerticalStripMatVecMPI::PreProcessingImpl() {
   return true;
 }
+
+namespace {
+
+void BroadcastDimensions(int &rows, int &cols) {
+  MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+}
+
+void GetProcessParams(int proc, int base, int rem, int &proc_start, int &proc_width) {
+  proc_start = proc * base;
+  if (proc < rem) {
+    proc_start += proc;
+  } else {
+    proc_start += rem;
+  }
+
+  proc_width = base;
+  if (proc < rem) {
+    proc_width += 1;
+  }
+}
+
+void DistributeVectorStripes(int world_size, const Vector &vector, int base, int rem, Vector &local_vector, int rank,
+                             int my_width) {
+  const int tag_vector = 101;
+
+  // Подавляем предупреждение о неиспользуемых параметрах
+  (void)base;
+  (void)rem;
+
+  if (rank == 0) {
+    for (int proc = 0; proc < world_size; ++proc) {
+      int proc_start = 0;
+      int proc_width = 0;
+      GetProcessParams(proc, base, rem, proc_start, proc_width);
+
+      if (proc_width <= 0) {
+        continue;
+      }
+
+      // Подготовка полосы вектора для процесса
+      std::vector<double> sendbuf(proc_width);
+      for (int j = 0; j < proc_width; ++j) {
+        sendbuf[j] = vector[proc_start + j];
+      }
+
+      if (proc == 0) {
+        local_vector = sendbuf;
+      } else {
+        MPI_Send(sendbuf.data(), proc_width, MPI_DOUBLE, proc, tag_vector, MPI_COMM_WORLD);
+      }
+    }
+  } else if (my_width > 0) {
+    MPI_Recv(local_vector.data(), my_width, MPI_DOUBLE, 0, tag_vector, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+}
+
+void MultiplyStrip(const std::vector<double> &matrix_flat, const Vector &local_vector, Vector &local_result, int rows,
+                   int cols, int my_width, int my_start) {
+  for (int i = 0; i < rows; ++i) {
+    for (int j = 0; j < my_width; ++j) {
+      int global_j = my_start + j;
+      local_result[i] += matrix_flat[i * cols + global_j] * local_vector[j];
+    }
+  }
+}
+
+void GatherResultsInRoot(int world_size, int rows, int base, int rem, const Vector &local_result,
+                         Vector &final_result) {
+  const int tag_result = 102;
+
+  // Подавляем предупреждение о неиспользуемых параметрах
+  (void)base;
+  (void)rem;
+
+  // Копируем свою часть
+  for (int i = 0; i < rows; ++i) {
+    final_result[i] = local_result[i];
+  }
+
+  // Получаем от других процессов
+  for (int proc = 1; proc < world_size; ++proc) {
+    std::vector<double> recv_buf(rows);
+    MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, tag_result, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+    for (int i = 0; i < rows; ++i) {
+      final_result[i] += recv_buf[i];
+    }
+  }
+}
+
+void BroadcastFinalResult(int rank, int world_size, const Vector &final_result, Vector &local_final_result) {
+  const int tag_broadcast = 103;
+
+  // Подавляем предупреждение о неиспользуемых параметрах
+  (void)world_size;
+
+  if (rank == 0) {
+    for (int proc = 1; proc < world_size; ++proc) {
+      MPI_Send(final_result.data(), final_result.size(), MPI_DOUBLE, proc, tag_broadcast, MPI_COMM_WORLD);
+    }
+  } else {
+    MPI_Recv(local_final_result.data(), local_final_result.size(), MPI_DOUBLE, 0, tag_broadcast, MPI_COMM_WORLD,
+             MPI_STATUS_IGNORE);
+  }
+}
+
+}  // namespace
 
 bool VerticalStripMatVecMPI::RunImpl() {
   int world_size, rank;
@@ -53,133 +179,95 @@ bool VerticalStripMatVecMPI::RunImpl() {
   if (rank == 0) {
     const auto &[matrix, vector] = GetInput();
     rows = static_cast<int>(matrix.size());
-    cols = static_cast<int>(matrix[0].size());
+    if (rows > 0) {
+      cols = static_cast<int>(matrix[0].size());
+    }
   }
 
   // Распространяем размеры
-  MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  BroadcastDimensions(rows, cols);
 
   if (rows <= 0 || cols <= 0) {
-    GetOutput() = std::vector<double>();
+    GetOutput() = Vector{};
     return true;
   }
 
-  // Если процессоров больше чем столбцов - используем только первый процесс
+  // Если процессоров больше чем столбцов
   if (world_size > cols) {
-    std::vector<double> result(rows, 0.0);
+    Vector result(rows, 0.0);
 
     if (rank == 0) {
       const auto &[matrix, vector] = GetInput();
+      // Последовательное умножение
       for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
           result[i] += matrix[i][j] * vector[j];
         }
       }
 
-      // Распространяем результат
+      // Отправляем результат всем
       for (int proc = 1; proc < world_size; ++proc) {
-        MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 0, MPI_COMM_WORLD);
+        MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 100, MPI_COMM_WORLD);
       }
     } else {
-      MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
 
     GetOutput() = result;
     return true;
   }
 
-  // Нормальный случай: распределяем столбцы
-
-  // Распределение столбцов
+  // Нормальное распределение - вертикальные полосы
   int base = cols / world_size;
   int rem = cols % world_size;
-  int start_col = rank * base + std::min(rank, rem);
-  int end_col = start_col + base + (rank < rem ? 1 : 0);
-  int local_cols = end_col - start_col;
+  int my_start = 0, my_width = 0;
+  GetProcessParams(rank, base, rem, my_start, my_width);
 
-  // Буферы
-  std::vector<double> matrix_flat(rows * cols);
-  std::vector<double> local_vector(local_cols);
-  std::vector<double> local_result(rows, 0.0);
-  std::vector<double> final_result(rows, 0.0);
+  // Подготовка данных
+  std::vector<double> matrix_flat(rows * cols, 0.0);
+  Vector local_vector(my_width, 0.0);
+  Vector local_result(rows, 0.0);
+  Vector final_result(rows, 0.0);
 
-  // Процесс 0 инициализирует данные
+  // Процесс 0 инициализирует матрицу и распределяет вектор
   if (rank == 0) {
     const auto &[matrix, vector] = GetInput();
 
-    // Заполняем матрицу
+    // Преобразуем матрицу в плоский массив
     for (int i = 0; i < rows; ++i) {
       for (int j = 0; j < cols; ++j) {
         matrix_flat[i * cols + j] = matrix[i][j];
       }
     }
-
-    // Своя часть вектора
-    for (int j = 0; j < local_cols; ++j) {
-      local_vector[j] = vector[start_col + j];
-    }
-
-    // Отправляем другим процессам их части
-    for (int proc = 1; proc < world_size; ++proc) {
-      int proc_start = proc * base + std::min(proc, rem);
-      int proc_end = proc_start + base + (proc < rem ? 1 : 0);
-      int proc_cols = proc_end - proc_start;
-
-      std::vector<double> send_buf(proc_cols);
-      for (int j = 0; j < proc_cols; ++j) {
-        send_buf[j] = vector[proc_start + j];
-      }
-
-      MPI_Send(send_buf.data(), proc_cols, MPI_DOUBLE, proc, 1, MPI_COMM_WORLD);
-    }
-  } else {
-    // Получаем свою часть вектора
-    if (local_cols > 0) {
-      MPI_Recv(local_vector.data(), local_cols, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
   }
 
   // Распространяем матрицу
-  if (rows > 0 && cols > 0) {
-    MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  }
+  MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+  // Распределяем полосы вектора
+  DistributeVectorStripes(world_size, rank == 0 ? GetInput().second : Vector{}, base, rem, local_vector, rank,
+                          my_width);
 
   // Локальные вычисления
-  for (int i = 0; i < rows; ++i) {
-    for (int j = 0; j < local_cols; ++j) {
-      local_result[i] += matrix_flat[i * cols + start_col + j] * local_vector[j];
-    }
+  if (my_width > 0) {
+    MultiplyStrip(matrix_flat, local_vector, local_result, rows, cols, my_width, my_start);
   }
 
-  // Сбор результатов
+  // Сбор и распространение результатов
   if (rank == 0) {
-    // Копируем свою часть
-    final_result = local_result;
-
-    // Получаем от других
-    for (int proc = 1; proc < world_size; ++proc) {
-      std::vector<double> recv_buf(rows);
-      MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-      for (int i = 0; i < rows; ++i) {
-        final_result[i] += recv_buf[i];
-      }
-    }
-
-    GetOutput() = final_result;
-
-    // Отправляем результат всем
-    for (int proc = 1; proc < world_size; ++proc) {
-      MPI_Send(final_result.data(), rows, MPI_DOUBLE, proc, 3, MPI_COMM_WORLD);
-    }
+    GatherResultsInRoot(world_size, rows, base, rem, local_result, final_result);
   } else {
-    // Отправляем свой результат
-    MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD);
+    MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, 102, MPI_COMM_WORLD);
+  }
 
-    // Получаем финальный результат
-    MPI_Recv(final_result.data(), rows, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  // Распространяем финальный результат
+  Vector local_final_result(rows, 0.0);
+  if (rank == 0) {
+    BroadcastFinalResult(rank, world_size, final_result, local_final_result);
     GetOutput() = final_result;
+  } else {
+    BroadcastFinalResult(rank, world_size, final_result, local_final_result);
+    GetOutput() = local_final_result;
   }
 
   return true;

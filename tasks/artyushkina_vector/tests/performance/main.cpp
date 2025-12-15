@@ -20,6 +20,7 @@ class VerticalStripMatVecPerfTests : public ppc::util::BaseRunPerfTests<InType, 
     matrix_ = Matrix(kSize, std::vector<double>(kSize));
     vector_ = Vector(kSize);
 
+    // Заполняем разреженную матрицу (около 20% ненулевых элементов)
     for (size_t i = 0; i < kSize; ++i) {
       for (size_t j = 0; j < kSize; ++j) {
         if ((i + j) % 5 == 0) {
@@ -37,7 +38,6 @@ class VerticalStripMatVecPerfTests : public ppc::util::BaseRunPerfTests<InType, 
   }
 
   InType GetTestInputData() final {
-    // Просто возвращаем данные
     return std::make_pair(matrix_, vector_);
   }
 
