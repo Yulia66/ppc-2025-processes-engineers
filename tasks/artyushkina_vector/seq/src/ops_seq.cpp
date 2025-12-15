@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <vector>
 
-// Для GCC отключим предупреждение о потенциальном разыменовании нулевого указателя
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wnull-dereference"
@@ -14,11 +13,9 @@ namespace artyushkina_vector {
 VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
 
-  // ИСПРАВЛЕНО: Используем безопасное копирование
   Matrix matrix_copy = in.first;
   Vector vector_copy = in.second;
 
-  // Присваиваем через move
   GetInput().first = std::move(matrix_copy);
   GetInput().second = std::move(vector_copy);
 
@@ -36,14 +33,12 @@ bool VerticalStripMatVecSEQ::ValidationImpl() {
   size_t cols = matrix[0].size();
   size_t vec_size = vector.size();
 
-  // Проверка прямоугольности матрицы
   for (size_t i = 1; i < rows; ++i) {
     if (matrix[i].size() != cols) {
       return false;
     }
   }
 
-  // Размер вектора должен совпадать с количеством столбцов матрицы
   return vec_size == cols;
 }
 
@@ -68,7 +63,6 @@ bool VerticalStripMatVecSEQ::RunImpl() {
     result.resize(rows, 0.0);
   }
 
-  // Классическое умножение матрицы на вектор
   for (size_t i = 0; i < rows; ++i) {
     double sum = 0.0;
     for (size_t j = 0; j < cols; ++j) {

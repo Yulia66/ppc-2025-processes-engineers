@@ -1,9 +1,8 @@
 #include "artyushkina_vector/mpi/include/ops_mpi.hpp"
 
-// Отключить предупреждение C4100 (неиспользуемые параметры) для MSVC
 #ifdef _MSC_VER
 #  pragma warning(push)
-#  pragma warning(disable : 4100)  // unreferenced formal parameter
+#  pragma warning(disable : 4100)
 #endif
 
 #include <mpi.h>
@@ -16,7 +15,6 @@
 #  pragma warning(pop)
 #endif
 
-// Для GCC отключим предупреждение о потенциальном разыменовании нулевого указателя
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wnull-dereference"
@@ -26,12 +24,9 @@ namespace artyushkina_vector {
 
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-
-  // ИСПРАВЛЕНО: Используем безопасное копирование
   Matrix matrix_copy = in.first;
   Vector vector_copy = in.second;
 
-  // Присваиваем через move
   GetInput().first = std::move(matrix_copy);
   GetInput().second = std::move(vector_copy);
 
@@ -54,14 +49,12 @@ bool VerticalStripMatVecMPI::ValidationImpl() {
 
   size_t cols = matrix[0].size();
 
-  // Проверяем, что матрица прямоугольная
   for (size_t i = 1; i < matrix.size(); ++i) {
     if (matrix[i].size() != cols) {
       return false;
     }
   }
 
-  // Количество столбцов матрицы должно совпадать с размером вектора
   return vector.size() == cols;
 }
 
@@ -94,7 +87,6 @@ void DistributeVectorStripes(int world_size, const Vector &vector, int base, int
                              int my_width) {
   const int tag_vector = 101;
 
-  // Подавляем предупреждение о неиспользуемых параметрах
   (void)base;
   (void)rem;
 
@@ -108,7 +100,6 @@ void DistributeVectorStripes(int world_size, const Vector &vector, int base, int
         continue;
       }
 
-      // Подготовка полосы вектора для процесса
       std::vector<double> sendbuf(proc_width);
       for (int j = 0; j < proc_width; ++j) {
         sendbuf[j] = vector[proc_start + j];
@@ -139,16 +130,13 @@ void GatherResultsInRoot(int world_size, int rows, int base, int rem, const Vect
                          Vector &final_result) {
   const int tag_result = 102;
 
-  // Подавляем предупреждение о неиспользуемых параметрах
   (void)base;
   (void)rem;
 
-  // Копируем свою часть
   for (int i = 0; i < rows; ++i) {
     final_result[i] = local_result[i];
   }
 
-  // Получаем от других процессов
   for (int proc = 1; proc < world_size; ++proc) {
     std::vector<double> recv_buf(rows);
     MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, tag_result, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
@@ -162,7 +150,6 @@ void GatherResultsInRoot(int world_size, int rows, int base, int rem, const Vect
 void BroadcastFinalResult(int rank, int world_size, const Vector &final_result, Vector &local_final_result) {
   const int tag_broadcast = 103;
 
-  // Подавляем предупреждение о неиспользуемых параметрах
   (void)world_size;
 
   if (rank == 0) {
@@ -184,7 +171,6 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   int rows = 0, cols = 0;
 
-  // Процесс 0 получает размеры
   if (rank == 0) {
     const auto &[matrix, vector] = GetInput();
     rows = static_cast<int>(matrix.size());
@@ -193,7 +179,6 @@ bool VerticalStripMatVecMPI::RunImpl() {
     }
   }
 
-  // Распространяем размеры
   BroadcastDimensions(rows, cols);
 
   if (rows <= 0 || cols <= 0) {
@@ -201,9 +186,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
     return true;
   }
 
-  // Если процессоров больше чем столбцов
   if (world_size > cols) {
-    // ИСПРАВЛЕНО: Безопасное создание вектора
     Vector result;
     if (rows > 0) {
       result.resize(rows, 0.0);
@@ -211,14 +194,12 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
     if (rank == 0) {
       const auto &[matrix, vector] = GetInput();
-      // Последовательное умножение
       for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
           result[i] += matrix[i][j] * vector[j];
         }
       }
 
-      // Отправляем результат всем
       for (int proc = 1; proc < world_size; ++proc) {
         MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 100, MPI_COMM_WORLD);
       }
@@ -230,13 +211,11 @@ bool VerticalStripMatVecMPI::RunImpl() {
     return true;
   }
 
-  // Нормальное распределение - вертикальные полосы
   int base = cols / world_size;
   int rem = cols % world_size;
   int my_start = 0, my_width = 0;
   GetProcessParams(rank, base, rem, my_start, my_width);
 
-  // ИСПРАВЛЕНО: Безопасная подготовка данных
   std::vector<double> matrix_flat;
   if (rows > 0 && cols > 0) {
     matrix_flat.resize(rows * cols, 0.0);
@@ -257,11 +236,9 @@ bool VerticalStripMatVecMPI::RunImpl() {
     final_result.resize(rows, 0.0);
   }
 
-  // Процесс 0 инициализирует матрицу и распределяет вектор
   if (rank == 0 && rows > 0 && cols > 0) {
     const auto &[matrix, vector] = GetInput();
 
-    // Преобразуем матрицу в плоский массив
     for (int i = 0; i < rows; ++i) {
       for (int j = 0; j < cols; ++j) {
         matrix_flat[i * cols + j] = matrix[i][j];
@@ -269,28 +246,23 @@ bool VerticalStripMatVecMPI::RunImpl() {
     }
   }
 
-  // Распространяем матрицу
   if (rows > 0 && cols > 0) {
     MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 
-  // Распределяем полосы вектора
   DistributeVectorStripes(world_size, rank == 0 ? GetInput().second : Vector{}, base, rem, local_vector, rank,
                           my_width);
 
-  // Локальные вычисления
   if (my_width > 0 && rows > 0 && cols > 0) {
     MultiplyStrip(matrix_flat, local_vector, local_result, rows, cols, my_width, my_start);
   }
 
-  // Сбор и распространение результатов
   if (rank == 0) {
     GatherResultsInRoot(world_size, rows, base, rem, local_result, final_result);
   } else if (rows > 0) {
     MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, 102, MPI_COMM_WORLD);
   }
 
-  // Распространяем финальный результат
   Vector local_final_result;
   if (rows > 0) {
     local_final_result.resize(rows, 0.0);
