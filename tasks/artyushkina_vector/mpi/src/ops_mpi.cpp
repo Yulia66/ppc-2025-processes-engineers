@@ -8,7 +8,9 @@ namespace artyushkina_vector {
 
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-  GetInput() = in;
+  // Используем move семантику
+  GetInput().first = std::move(in.first);
+  GetInput().second = std::move(in.second);
   GetOutput() = OutType{};
 }
 
@@ -63,11 +65,10 @@ bool VerticalStripMatVecMPI::RunImpl() {
     return true;
   }
 
-  // Создаем вектор результата
-  std::vector<double> result(rows, 0.0);
-
   // Если процессоров больше чем столбцов - используем только первый процесс
   if (world_size > cols) {
+    std::vector<double> result(rows, 0.0);
+
     if (rank == 0) {
       const auto &[matrix, vector] = GetInput();
       for (int i = 0; i < rows; ++i) {
@@ -75,10 +76,8 @@ bool VerticalStripMatVecMPI::RunImpl() {
           result[i] += matrix[i][j] * vector[j];
         }
       }
-    }
 
-    // Распространяем результат
-    if (rank == 0) {
+      // Распространяем результат
       for (int proc = 1; proc < world_size; ++proc) {
         MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 0, MPI_COMM_WORLD);
       }
@@ -92,67 +91,67 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   // Нормальный случай: распределяем столбцы
 
-  // Каждый процесс вычисляет свою часть
+  // Распределение столбцов
   int base = cols / world_size;
   int rem = cols % world_size;
   int start_col = rank * base + std::min(rank, rem);
   int end_col = start_col + base + (rank < rem ? 1 : 0);
+  int local_cols = end_col - start_col;
 
-  // Создаем локальные буферы
+  // Буферы
   std::vector<double> matrix_flat(rows * cols);
-  std::vector<double> local_vector(end_col - start_col);
+  std::vector<double> local_vector(local_cols);
   std::vector<double> local_result(rows, 0.0);
+  std::vector<double> final_result(rows, 0.0);
 
-  // Процесс 0 заполняет матрицу и распределяет вектор
+  // Процесс 0 инициализирует данные
   if (rank == 0) {
     const auto &[matrix, vector] = GetInput();
 
-    // Заполняем плоскую матрицу
+    // Заполняем матрицу
     for (int i = 0; i < rows; ++i) {
       for (int j = 0; j < cols; ++j) {
         matrix_flat[i * cols + j] = matrix[i][j];
       }
     }
 
-    // Заполняем свою часть вектора
-    for (int j = start_col; j < end_col; ++j) {
-      local_vector[j - start_col] = vector[j];
+    // Своя часть вектора
+    for (int j = 0; j < local_cols; ++j) {
+      local_vector[j] = vector[start_col + j];
     }
 
-    // Отправляем части вектора другим процессам
+    // Отправляем другим процессам их части
     for (int proc = 1; proc < world_size; ++proc) {
       int proc_start = proc * base + std::min(proc, rem);
       int proc_end = proc_start + base + (proc < rem ? 1 : 0);
-      int proc_width = proc_end - proc_start;
+      int proc_cols = proc_end - proc_start;
 
-      std::vector<double> send_buf(proc_width);
-      for (int j = 0; j < proc_width; ++j) {
+      std::vector<double> send_buf(proc_cols);
+      for (int j = 0; j < proc_cols; ++j) {
         send_buf[j] = vector[proc_start + j];
       }
 
-      MPI_Send(send_buf.data(), proc_width, MPI_DOUBLE, proc, 1, MPI_COMM_WORLD);
+      MPI_Send(send_buf.data(), proc_cols, MPI_DOUBLE, proc, 1, MPI_COMM_WORLD);
     }
   } else {
     // Получаем свою часть вектора
-    int local_width = end_col - start_col;
-    MPI_Recv(local_vector.data(), local_width, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(local_vector.data(), local_cols, MPI_DOUBLE, 0, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 
-  // Все получают матрицу
+  // Распространяем матрицу
   MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
   // Локальные вычисления
   for (int i = 0; i < rows; ++i) {
-    for (int j = start_col; j < end_col; ++j) {
-      int local_j = j - start_col;
-      local_result[i] += matrix_flat[i * cols + j] * local_vector[local_j];
+    for (int j = 0; j < local_cols; ++j) {
+      local_result[i] += matrix_flat[i * cols + start_col + j] * local_vector[j];
     }
   }
 
-  // Сбор результатов на процесс 0
+  // Сбор результатов
   if (rank == 0) {
     // Копируем свою часть
-    result = local_result;
+    final_result = local_result;
 
     // Получаем от других
     for (int proc = 1; proc < world_size; ++proc) {
@@ -160,23 +159,23 @@ bool VerticalStripMatVecMPI::RunImpl() {
       MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, 2, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
       for (int i = 0; i < rows; ++i) {
-        result[i] += recv_buf[i];
+        final_result[i] += recv_buf[i];
       }
     }
 
-    GetOutput() = result;
+    GetOutput() = final_result;
 
-    // Отправляем финальный результат всем
+    // Отправляем результат всем
     for (int proc = 1; proc < world_size; ++proc) {
-      MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 3, MPI_COMM_WORLD);
+      MPI_Send(final_result.data(), rows, MPI_DOUBLE, proc, 3, MPI_COMM_WORLD);
     }
   } else {
     // Отправляем свой результат
     MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, 2, MPI_COMM_WORLD);
 
     // Получаем финальный результат
-    MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    GetOutput() = result;
+    MPI_Recv(final_result.data(), rows, MPI_DOUBLE, 0, 3, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    GetOutput() = final_result;
   }
 
   return true;

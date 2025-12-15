@@ -7,7 +7,9 @@ namespace artyushkina_vector {
 
 VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-  GetInput() = in;
+  // Используем move семантику вместо копирования
+  GetInput().first = std::move(in.first);
+  GetInput().second = std::move(in.second);
   GetOutput() = OutType{};
 }
 
@@ -51,7 +53,6 @@ bool VerticalStripMatVecSEQ::RunImpl() {
 
   Vector result(rows, 0.0);
 
-  // Классическое умножение матрицы на вектор
   for (size_t i = 0; i < rows; ++i) {
     double sum = 0.0;
     for (size_t j = 0; j < cols; ++j) {
