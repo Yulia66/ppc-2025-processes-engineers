@@ -21,10 +21,8 @@ namespace artyushkina_vector {
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
 
-  // Простое копирование входных данных
-  auto &[matrix, vector] = GetInput();
-  matrix = in.first;
-  vector = in.second;
+  // Простая инициализация без декомпозиции
+  GetInput() = in;
 
   GetOutput() = OutType{};
 }

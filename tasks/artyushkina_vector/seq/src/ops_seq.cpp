@@ -8,11 +8,12 @@ namespace artyushkina_vector {
 VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
 
-  auto &[matrix, vector] = GetInput();
-  matrix = in.first;
-  vector = in.second;
+  // Полностью избегаем декомпозиции
+  std::pair<Matrix, Vector> &input = GetInput();
+  input.first = in.first;
+  input.second = in.second;
 
-  GetOutput() = OutType{};
+  GetOutput() = Vector{};  // Явно создаем пустой вектор
 }
 
 bool VerticalStripMatVecSEQ::ValidationImpl() {
