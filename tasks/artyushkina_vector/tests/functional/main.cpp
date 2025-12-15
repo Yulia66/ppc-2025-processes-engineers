@@ -23,10 +23,8 @@ class VerticalStripMatVecFuncTests : public ppc::util::BaseRunFuncTests<InType, 
     const auto &matrix = std::get<1>(test_param);
     const auto &vector = std::get<2>(test_param);
 
-    return "test_" + std::to_string(test_id) + "_" + 
-           std::to_string(matrix.size()) + "x" + 
-           (matrix.empty() ? "0" : std::to_string(matrix[0].size())) + 
-           "_vec_" + std::to_string(vector.size());
+    return "test_" + std::to_string(test_id) + "_" + std::to_string(matrix.size()) + "x" +
+           (matrix.empty() ? "0" : std::to_string(matrix[0].size())) + "_vec_" + std::to_string(vector.size());
   }
 
  protected:
@@ -35,7 +33,7 @@ class VerticalStripMatVecFuncTests : public ppc::util::BaseRunFuncTests<InType, 
 
     const auto &matrix = std::get<1>(params);
     const auto &vector = std::get<2>(params);
-    
+
     // Просто копируем данные (оригинальные типы)
     input_data_ = std::make_pair(matrix, vector);
     expected_ = std::get<3>(params);
@@ -93,50 +91,32 @@ TestType CreateVectorTest(int test_id, int rows, int cols) {
 }
 
 const std::array<TestType, 7> kTestParam = {
-    std::make_tuple(1,
-        Matrix{{1, 2}, {3, 4}},
-        Vector{5, 6},
-        Vector{1*5 + 2*6, 3*5 + 4*6}),  // [17, 39]
-    
-    std::make_tuple(2,
-        Matrix{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}},
-        Vector{2, 3, 4},
-        Vector{2, 3, 4}),
-    
+    std::make_tuple(1, Matrix{{1, 2}, {3, 4}}, Vector{5, 6}, Vector{1 * 5 + 2 * 6, 3 * 5 + 4 * 6}),  // [17, 39]
+
+    std::make_tuple(2, Matrix{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, Vector{2, 3, 4}, Vector{2, 3, 4}),
+
     CreateVectorTest(3, 2, 3),
-    
+
     CreateVectorTest(4, 4, 2),
-    
-    std::make_tuple(5,
-        Matrix{{0, 0, 0}, {0, 0, 0}},
-        Vector{1, 2, 3},
-        Vector{0, 0}),
-    
-    std::make_tuple(6,
-        Matrix{{2.5}},
-        Vector{3.0},
-        Vector{7.5}),
-    
-    CreateVectorTest(7, 1, 5)
-};
+
+    std::make_tuple(5, Matrix{{0, 0, 0}, {0, 0, 0}}, Vector{1, 2, 3}, Vector{0, 0}),
+
+    std::make_tuple(6, Matrix{{2.5}}, Vector{3.0}, Vector{7.5}),
+
+    CreateVectorTest(7, 1, 5)};
 
 TEST_P(VerticalStripMatVecFuncTests, MatrixVectorMultiplication) {
   ExecuteTest(GetParam());
 }
 
-const auto kTestTasksList = std::tuple_cat(
-    ppc::util::AddFuncTask<VerticalStripMatVecMPI, InType>(
-        kTestParam, PPC_SETTINGS_artyushkina_vector),
-    ppc::util::AddFuncTask<VerticalStripMatVecSEQ, InType>(
-        kTestParam, PPC_SETTINGS_artyushkina_vector));
+const auto kTestTasksList =
+    std::tuple_cat(ppc::util::AddFuncTask<VerticalStripMatVecMPI, InType>(kTestParam, PPC_SETTINGS_artyushkina_vector),
+                   ppc::util::AddFuncTask<VerticalStripMatVecSEQ, InType>(kTestParam, PPC_SETTINGS_artyushkina_vector));
 
 const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
 const auto kPerfTestName = VerticalStripMatVecFuncTests::PrintFuncTestName<VerticalStripMatVecFuncTests>;
 
-INSTANTIATE_TEST_SUITE_P(VectorMultiplicationTests, 
-                         VerticalStripMatVecFuncTests, 
-                         kGtestValues, 
-                         kPerfTestName);
+INSTANTIATE_TEST_SUITE_P(VectorMultiplicationTests, VerticalStripMatVecFuncTests, kGtestValues, kPerfTestName);
 
 }  // namespace
 

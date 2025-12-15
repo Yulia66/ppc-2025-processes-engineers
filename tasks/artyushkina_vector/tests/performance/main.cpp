@@ -50,16 +50,12 @@ TEST_P(VerticalStripMatVecPerfTests, RunPerfModes) {
   ExecuteTest(GetParam());
 }
 
-const auto kAllPerfTasks =
-    ppc::util::MakeAllPerfTasks<InType, VerticalStripMatVecMPI, VerticalStripMatVecSEQ>(
-        PPC_SETTINGS_artyushkina_vector);
+const auto kAllPerfTasks = ppc::util::MakeAllPerfTasks<InType, VerticalStripMatVecMPI, VerticalStripMatVecSEQ>(
+    PPC_SETTINGS_artyushkina_vector);
 
 const auto kGtestValues = ppc::util::TupleToGTestValues(kAllPerfTasks);
 const auto kPerfTestName = VerticalStripMatVecPerfTests::CustomPerfTestName;
 
-INSTANTIATE_TEST_SUITE_P(PerfTests, 
-                         VerticalStripMatVecPerfTests, 
-                         kGtestValues, 
-                         kPerfTestName);
+INSTANTIATE_TEST_SUITE_P(PerfTests, VerticalStripMatVecPerfTests, kGtestValues, kPerfTestName);
 
 }  // namespace artyushkina_vector

@@ -15,11 +15,11 @@ VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
 
 bool VerticalStripMatVecSEQ::ValidationImpl() {
   const auto &[matrix, vector] = GetInput();
-  
+
   if (matrix.empty() || vector.empty()) {
     return false;
   }
-  
+
   size_t rows = matrix.size();
   size_t cols = matrix[0].size();
   size_t vec_size = vector.size();
@@ -42,15 +42,15 @@ bool VerticalStripMatVecSEQ::PreProcessingImpl() {
 
 bool VerticalStripMatVecSEQ::RunImpl() {
   const auto &[matrix, vector] = GetInput();
-  
+
   if (matrix.empty() || vector.empty()) {
     GetOutput() = std::vector<double>();
     return true;
   }
-  
+
   size_t rows = matrix.size();
   size_t cols = matrix[0].size();
-  
+
   std::vector<double> result(rows, 0.0);
 
   // Классическое умножение матрицы на вектор
