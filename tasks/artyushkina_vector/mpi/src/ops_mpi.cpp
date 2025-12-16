@@ -2,7 +2,6 @@
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <utility>
 #include <vector>
@@ -51,6 +50,11 @@ bool VerticalStripMatVecMPI::PreProcessingImpl() {
 
 namespace {
 
+constexpr int kTagVector = 101;
+constexpr int kTagResult = 102;
+constexpr int kTagBroadcast = 103;
+constexpr int kTagSimple = 100;
+
 void BroadcastDimensions(int &rows, int &cols) {
   MPI_Bcast(&rows, 1, MPI_INT, 0, MPI_COMM_WORLD);
   MPI_Bcast(&cols, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -74,8 +78,6 @@ std::pair<int, int> GetProcessParams(int proc, int base, int rem) {
 
 void DistributeVectorStripes(int world_size, const Vector &vector, int base, int rem, std::vector<double> &local_vector,
                              int rank, int my_width) {
-  constexpr int tag_vector = 101;
-
   if (rank == 0) {
     for (int proc = 0; proc < world_size; ++proc) {
       auto [proc_start, proc_width] = GetProcessParams(proc, base, rem);
@@ -86,31 +88,31 @@ void DistributeVectorStripes(int world_size, const Vector &vector, int base, int
 
       std::vector<double> sendbuf(static_cast<size_t>(proc_width));
       for (int j = 0; j < proc_width; ++j) {
-        size_t j_idx = static_cast<size_t>(j);
-        size_t src_idx = static_cast<size_t>(proc_start) + j_idx;
+        auto j_idx = static_cast<size_t>(j);
+        auto src_idx = static_cast<size_t>(proc_start) + j_idx;
         sendbuf[j_idx] = vector[src_idx];
       }
 
       if (proc == 0) {
         local_vector = sendbuf;
       } else {
-        MPI_Send(sendbuf.data(), proc_width, MPI_DOUBLE, proc, tag_vector, MPI_COMM_WORLD);
+        MPI_Send(sendbuf.data(), proc_width, MPI_DOUBLE, proc, kTagVector, MPI_COMM_WORLD);
       }
     }
   } else if (my_width > 0) {
-    MPI_Recv(local_vector.data(), my_width, MPI_DOUBLE, 0, tag_vector, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(local_vector.data(), my_width, MPI_DOUBLE, 0, kTagVector, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 }
 
 void MultiplyStrip(const std::vector<double> &matrix_flat, const std::vector<double> &local_vector,
                    std::vector<double> &local_result, int rows, int cols, int my_width, int my_start) {
   for (int i = 0; i < rows; ++i) {
-    size_t i_idx = static_cast<size_t>(i);
+    auto i_idx = static_cast<size_t>(i);
     for (int j = 0; j < my_width; ++j) {
-      size_t j_idx = static_cast<size_t>(j);
-      int global_j = my_start + j;
-      size_t global_j_idx = static_cast<size_t>(global_j);
-      size_t matrix_idx = static_cast<size_t>(i * cols) + global_j_idx;
+      auto j_idx = static_cast<size_t>(j);
+      auto global_j = my_start + j;
+      auto global_j_idx = static_cast<size_t>(global_j);
+      auto matrix_idx = static_cast<size_t>(i * cols) + global_j_idx;
       local_result[i_idx] += matrix_flat[matrix_idx] * local_vector[j_idx];
     }
   }
@@ -118,19 +120,17 @@ void MultiplyStrip(const std::vector<double> &matrix_flat, const std::vector<dou
 
 void GatherResultsInRoot(int world_size, int rows, const std::vector<double> &local_result,
                          std::vector<double> &final_result) {
-  constexpr int tag_result = 102;
-
   for (int i = 0; i < rows; ++i) {
-    size_t i_idx = static_cast<size_t>(i);
+    auto i_idx = static_cast<size_t>(i);
     final_result[i_idx] = local_result[i_idx];
   }
 
   for (int proc = 1; proc < world_size; ++proc) {
     std::vector<double> recv_buf(static_cast<size_t>(rows));
-    MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, tag_result, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, kTagResult, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     for (int i = 0; i < rows; ++i) {
-      size_t i_idx = static_cast<size_t>(i);
+      auto i_idx = static_cast<size_t>(i);
       final_result[i_idx] += recv_buf[i_idx];
     }
   }
@@ -138,15 +138,13 @@ void GatherResultsInRoot(int world_size, int rows, const std::vector<double> &lo
 
 void BroadcastFinalResult(int rank, int world_size, const std::vector<double> &final_result,
                           std::vector<double> &local_final_result) {
-  constexpr int tag_broadcast = 103;
-
   if (rank == 0) {
     for (int proc = 1; proc < world_size; ++proc) {
-      MPI_Send(final_result.data(), static_cast<int>(final_result.size()), MPI_DOUBLE, proc, tag_broadcast,
+      MPI_Send(final_result.data(), static_cast<int>(final_result.size()), MPI_DOUBLE, proc, kTagBroadcast,
                MPI_COMM_WORLD);
     }
   } else {
-    MPI_Recv(local_final_result.data(), static_cast<int>(local_final_result.size()), MPI_DOUBLE, 0, tag_broadcast,
+    MPI_Recv(local_final_result.data(), static_cast<int>(local_final_result.size()), MPI_DOUBLE, 0, kTagBroadcast,
              MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 }
@@ -160,18 +158,18 @@ bool HandleWorldSizeGreaterThanCols(int world_size, int rank, int rows, int cols
   if (rank == 0) {
     const auto &[matrix, vector] = input;
     for (int i = 0; i < rows; ++i) {
-      size_t i_idx = static_cast<size_t>(i);
+      auto i_idx = static_cast<size_t>(i);
       for (int j = 0; j < cols; ++j) {
-        size_t j_idx = static_cast<size_t>(j);
+        auto j_idx = static_cast<size_t>(j);
         result[i_idx] += matrix[i_idx][j_idx] * vector[j_idx];
       }
     }
 
     for (int proc = 1; proc < world_size; ++proc) {
-      MPI_Send(result.data(), rows, MPI_DOUBLE, proc, 100, MPI_COMM_WORLD);
+      MPI_Send(result.data(), rows, MPI_DOUBLE, proc, kTagSimple, MPI_COMM_WORLD);
     }
   } else if (rows > 0) {
-    MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, 100, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    MPI_Recv(result.data(), rows, MPI_DOUBLE, 0, kTagSimple, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 
   return true;
@@ -181,10 +179,10 @@ void PrepareMatrixFlat(int rank, int rows, int cols, std::vector<double> &matrix
   if (rank == 0 && rows > 0 && cols > 0) {
     const auto &[matrix, vector] = input;
     for (int i = 0; i < rows; ++i) {
-      size_t i_idx = static_cast<size_t>(i);
+      auto i_idx = static_cast<size_t>(i);
       for (int j = 0; j < cols; ++j) {
-        size_t j_idx = static_cast<size_t>(j);
-        size_t matrix_idx = static_cast<size_t>(i * cols) + j_idx;
+        auto j_idx = static_cast<size_t>(j);
+        auto matrix_idx = static_cast<size_t>(i * cols) + j_idx;
         matrix_flat[matrix_idx] = matrix[i_idx][j_idx];
       }
     }
@@ -206,6 +204,69 @@ std::pair<int, int> CalculateDimensions(int rank, const InType &input) {
   return {rows, cols};
 }
 
+bool ProcessDimensions(int world_size, int rank, int &rows, int &cols, const InType &input_data, Vector &result) {
+  if (rows <= 0 || cols <= 0) {
+    result = Vector{};
+    return true;
+  }
+
+  if (world_size > cols) {
+    return HandleWorldSizeGreaterThanCols(world_size, rank, rows, cols, result, input_data);
+  }
+
+  return false;
+}
+
+bool PrepareLocalData(int rows, int cols, int my_width, std::vector<double> &matrix_flat,
+                      std::vector<double> &local_vector, std::vector<double> &local_result,
+                      std::vector<double> &final_result) {
+  if (rows > 0 && cols > 0) {
+    matrix_flat.resize(static_cast<size_t>(rows) * static_cast<size_t>(cols), 0.0);
+  }
+
+  if (my_width > 0) {
+    local_vector.resize(static_cast<size_t>(my_width), 0.0);
+  }
+
+  if (rows > 0) {
+    local_result.resize(static_cast<size_t>(rows), 0.0);
+    final_result.resize(static_cast<size_t>(rows), 0.0);
+  }
+
+  return true;
+}
+
+bool PerformLocalComputation(int rank, int world_size, int rows, int cols, int my_start, int my_width,
+                             const InType &input_data, std::vector<double> &matrix_flat,
+                             std::vector<double> &local_vector, std::vector<double> &local_result,
+                             std::vector<double> &final_result) {
+  PrepareMatrixFlat(rank, rows, cols, matrix_flat, input_data);
+
+  if (rows > 0 && cols > 0) {
+    MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  }
+
+  DistributeVectorStripes(world_size, rank == 0 ? input_data.second : Vector{}, cols / world_size, cols % world_size,
+                          local_vector, rank, my_width);
+
+  if (my_width > 0 && rows > 0 && cols > 0) {
+    MultiplyStrip(matrix_flat, local_vector, local_result, rows, cols, my_width, my_start);
+  }
+
+  return true;
+}
+
+bool CollectResults(int rank, int world_size, int rows, const std::vector<double> &local_result,
+                    std::vector<double> &final_result) {
+  if (rank == 0) {
+    GatherResultsInRoot(world_size, rows, local_result, final_result);
+  } else if (rows > 0) {
+    MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, kTagResult, MPI_COMM_WORLD);
+  }
+
+  return true;
+}
+
 }  // namespace
 
 bool VerticalStripMatVecMPI::RunImpl() {
@@ -218,18 +279,12 @@ bool VerticalStripMatVecMPI::RunImpl() {
   auto [rows, cols] = CalculateDimensions(rank, input_data);
   BroadcastDimensions(rows, cols);
 
-  if (rows <= 0 || cols <= 0) {
-    GetOutput() = Vector{};
-    return true;
-  }
-
-  if (world_size > cols) {
-    Vector result;
-    if (HandleWorldSizeGreaterThanCols(world_size, rank, rows, cols, result, input_data)) {
+  Vector result;
+  if (ProcessDimensions(world_size, rank, rows, cols, input_data, result)) {
+    if (!result.empty()) {
       GetOutput() = result;
-      return true;
     }
-    return false;
+    return true;
   }
 
   int base = cols / world_size;
@@ -238,43 +293,16 @@ bool VerticalStripMatVecMPI::RunImpl() {
   auto [my_start, my_width] = GetProcessParams(rank, base, rem);
 
   std::vector<double> matrix_flat;
-  if (rows > 0 && cols > 0) {
-    matrix_flat.resize(static_cast<size_t>(rows) * static_cast<size_t>(cols), 0.0);
-  }
-
   std::vector<double> local_vector;
-  if (my_width > 0) {
-    local_vector.resize(static_cast<size_t>(my_width), 0.0);
-  }
-
   std::vector<double> local_result;
-  if (rows > 0) {
-    local_result.resize(static_cast<size_t>(rows), 0.0);
-  }
-
   std::vector<double> final_result;
-  if (rows > 0) {
-    final_result.resize(static_cast<size_t>(rows), 0.0);
-  }
 
-  PrepareMatrixFlat(rank, rows, cols, matrix_flat, input_data);
+  PrepareLocalData(rows, cols, my_width, matrix_flat, local_vector, local_result, final_result);
 
-  if (rows > 0 && cols > 0) {
-    MPI_Bcast(matrix_flat.data(), rows * cols, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-  }
+  PerformLocalComputation(rank, world_size, rows, cols, my_start, my_width, input_data, matrix_flat, local_vector,
+                          local_result, final_result);
 
-  DistributeVectorStripes(world_size, rank == 0 ? input_data.second : Vector{}, base, rem, local_vector, rank,
-                          my_width);
-
-  if (my_width > 0 && rows > 0 && cols > 0) {
-    MultiplyStrip(matrix_flat, local_vector, local_result, rows, cols, my_width, my_start);
-  }
-
-  if (rank == 0) {
-    GatherResultsInRoot(world_size, rows, local_result, final_result);
-  } else if (rows > 0) {
-    MPI_Send(local_result.data(), rows, MPI_DOUBLE, 0, 102, MPI_COMM_WORLD);
-  }
+  CollectResults(rank, world_size, rows, local_result, final_result);
 
   std::vector<double> local_final_result;
   if (rows > 0) {

@@ -26,9 +26,9 @@ bool VerticalStripMatVecSEQ::ValidationImpl() {
     return false;
   }
 
-  size_t rows = matrix.size();
-  size_t cols = matrix[0].size();
-  size_t vec_size = vector.size();
+  const size_t rows = matrix.size();
+  const size_t cols = matrix[0].size();
+  const size_t vec_size = vector.size();
 
   for (size_t i = 1; i < rows; ++i) {
     if (matrix[i].size() != cols) {
@@ -52,8 +52,8 @@ bool VerticalStripMatVecSEQ::RunImpl() {
     return true;
   }
 
-  size_t rows = matrix.size();
-  size_t cols = matrix[0].size();
+  const size_t rows = matrix.size();
+  const size_t cols = matrix[0].size();
 
   Vector result(rows, 0.0);
 
