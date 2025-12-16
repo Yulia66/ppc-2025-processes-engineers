@@ -204,14 +204,19 @@ std::pair<int, int> CalculateDimensions(int rank, const InType &input) {
   return {rows, cols};
 }
 
-bool ProcessDimensions(int world_size, int rank, int &rows, int &cols, const InType &input_data, Vector &result) {
+bool ProcessDimensions(int world_size, int rank, int rows, int cols, const InType &input_data, Vector &result) {
   if (rows <= 0 || cols <= 0) {
     result = Vector{};
     return true;
   }
 
   if (world_size > cols) {
-    return HandleWorldSizeGreaterThanCols(world_size, rank, rows, cols, result, input_data);
+    std::vector<double> temp_result;
+    bool success = HandleWorldSizeGreaterThanCols(world_size, rank, rows, cols, temp_result, input_data);
+    if (success && !temp_result.empty()) {
+      result = Vector(temp_result.begin(), temp_result.end());
+    }
+    return true;
   }
 
   return false;
@@ -238,8 +243,7 @@ bool PrepareLocalData(int rows, int cols, int my_width, std::vector<double> &mat
 
 bool PerformLocalComputation(int rank, int world_size, int rows, int cols, int my_start, int my_width,
                              const InType &input_data, std::vector<double> &matrix_flat,
-                             std::vector<double> &local_vector, std::vector<double> &local_result,
-                             std::vector<double> &final_result) {
+                             std::vector<double> &local_vector, std::vector<double> &local_result) {
   PrepareMatrixFlat(rank, rows, cols, matrix_flat, input_data);
 
   if (rows > 0 && cols > 0) {
@@ -283,6 +287,8 @@ bool VerticalStripMatVecMPI::RunImpl() {
   if (ProcessDimensions(world_size, rank, rows, cols, input_data, result)) {
     if (!result.empty()) {
       GetOutput() = result;
+    } else {
+      GetOutput() = Vector{};
     }
     return true;
   }
@@ -300,7 +306,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
   PrepareLocalData(rows, cols, my_width, matrix_flat, local_vector, local_result, final_result);
 
   PerformLocalComputation(rank, world_size, rows, cols, my_start, my_width, input_data, matrix_flat, local_vector,
-                          local_result, final_result);
+                          local_result);
 
   CollectResults(rank, world_size, rows, local_result, final_result);
 
@@ -311,10 +317,10 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   if (rank == 0) {
     BroadcastFinalResult(rank, world_size, final_result, local_final_result);
-    GetOutput() = final_result;
+    GetOutput() = Vector(final_result.begin(), final_result.end());
   } else {
     BroadcastFinalResult(rank, world_size, final_result, local_final_result);
-    GetOutput() = local_final_result;
+    GetOutput() = Vector(local_final_result.begin(), local_final_result.end());
   }
 
   return true;
