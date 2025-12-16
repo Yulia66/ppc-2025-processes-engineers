@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "artyushkina_vector/common/include/common.hpp"
+
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wnull-dereference"
@@ -13,13 +15,7 @@ namespace artyushkina_vector {
 
 VerticalStripMatVecSEQ::VerticalStripMatVecSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
-
-  Matrix matrix_copy = in.first;
-  Vector vector_copy = in.second;
-
-  GetInput().first = std::move(matrix_copy);
-  GetInput().second = std::move(vector_copy);
-
+  GetInput() = in;
   GetOutput() = Vector{};
 }
 
