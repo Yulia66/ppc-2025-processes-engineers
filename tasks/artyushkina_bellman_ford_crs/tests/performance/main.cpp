@@ -19,16 +19,16 @@ class BellmanFordCRSPerfTests : public ppc::util::BaseRunPerfTests<InType, OutTy
   void SetUp() override {
     graph_.num_vertices = static_cast<int32_t>(kVertices);
     graph_.source_vertex = 0;
-    
+
     // Генерируем случайный граф
     graph_.row_ptr.resize(kVertices + 1, 0);
     graph_.col_idx.reserve(kVertices * kEdgesPerVertex);
     graph_.values.reserve(kVertices * kEdgesPerVertex);
-    
+
     size_t edge_count = 0;
     for (size_t i = 0; i < kVertices; ++i) {
       graph_.row_ptr[i] = static_cast<int32_t>(edge_count);
-      
+
       // Добавляем несколько случайных исходящих ребер
       for (size_t j = 0; j < kEdgesPerVertex && j < kVertices; ++j) {
         size_t target = (i + j + 1) % kVertices;  // Простая детерминированная генерация

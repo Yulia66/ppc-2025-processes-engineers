@@ -9,18 +9,17 @@
 
 namespace artyushkina_bellman_ford_crs {
 
-
 struct CRSGraph {
   std::vector<int32_t> row_ptr;
   std::vector<int32_t> col_idx;
-  std::vector<double> values;       
-  int32_t num_vertices;            
-  int32_t num_edges;               
-  int32_t source_vertex;            
+  std::vector<double> values;
+  int32_t num_vertices;
+  int32_t num_edges;
+  int32_t source_vertex;
 };
 
 using InType = CRSGraph;
-using OutType = std::vector<double>; 
+using OutType = std::vector<double>;
 using TestType = std::tuple<int, CRSGraph, std::vector<double>>;
 using BaseTask = ppc::task::Task<InType, OutType>;
 
