@@ -1,19 +1,11 @@
 #include "artyushkina_vector/mpi/include/ops_mpi.hpp"
 
-#ifdef _MSC_VER
-#  pragma warning(push)
-#  pragma warning(disable : 4100)
-#endif
-
 #include <mpi.h>
 
-#include <algorithm>
 #include <cstddef>
+#include <cstdint>
+#include <utility>
 #include <vector>
-
-#ifdef _MSC_VER
-#  pragma warning(pop)
-#endif
 
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
@@ -24,6 +16,7 @@ namespace artyushkina_vector {
 
 VerticalStripMatVecMPI::VerticalStripMatVecMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
+
   Matrix matrix_copy = in.first;
   Vector vector_copy = in.second;
 
@@ -100,9 +93,9 @@ void DistributeVectorStripes(int world_size, const Vector &vector, int base, int
         continue;
       }
 
-      std::vector<double> sendbuf(proc_width);
+      std::vector<double> sendbuf(static_cast<size_t>(proc_width));
       for (int j = 0; j < proc_width; ++j) {
-        sendbuf[j] = vector[proc_start + j];
+        sendbuf[static_cast<size_t>(j)] = vector[static_cast<size_t>(proc_start + j)];
       }
 
       if (proc == 0) {
@@ -121,7 +114,8 @@ void MultiplyStrip(const std::vector<double> &matrix_flat, const Vector &local_v
   for (int i = 0; i < rows; ++i) {
     for (int j = 0; j < my_width; ++j) {
       int global_j = my_start + j;
-      local_result[i] += matrix_flat[i * cols + global_j] * local_vector[j];
+      local_result[static_cast<size_t>(i)] +=
+          matrix_flat[static_cast<size_t>((i * cols) + global_j)] * local_vector[static_cast<size_t>(j)];
     }
   }
 }
@@ -134,15 +128,15 @@ void GatherResultsInRoot(int world_size, int rows, int base, int rem, const Vect
   (void)rem;
 
   for (int i = 0; i < rows; ++i) {
-    final_result[i] = local_result[i];
+    final_result[static_cast<size_t>(i)] = local_result[static_cast<size_t>(i)];
   }
 
   for (int proc = 1; proc < world_size; ++proc) {
-    std::vector<double> recv_buf(rows);
+    std::vector<double> recv_buf(static_cast<size_t>(rows));
     MPI_Recv(recv_buf.data(), rows, MPI_DOUBLE, proc, tag_result, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
 
     for (int i = 0; i < rows; ++i) {
-      final_result[i] += recv_buf[i];
+      final_result[static_cast<size_t>(i)] += recv_buf[static_cast<size_t>(i)];
     }
   }
 }
@@ -154,22 +148,25 @@ void BroadcastFinalResult(int rank, int world_size, const Vector &final_result, 
 
   if (rank == 0) {
     for (int proc = 1; proc < world_size; ++proc) {
-      MPI_Send(final_result.data(), final_result.size(), MPI_DOUBLE, proc, tag_broadcast, MPI_COMM_WORLD);
+      MPI_Send(final_result.data(), static_cast<int>(final_result.size()), MPI_DOUBLE, proc, tag_broadcast,
+               MPI_COMM_WORLD);
     }
   } else {
-    MPI_Recv(local_final_result.data(), local_final_result.size(), MPI_DOUBLE, 0, tag_broadcast, MPI_COMM_WORLD,
-             MPI_STATUS_IGNORE);
+    MPI_Recv(local_final_result.data(), static_cast<int>(local_final_result.size()), MPI_DOUBLE, 0, tag_broadcast,
+             MPI_COMM_WORLD, MPI_STATUS_IGNORE);
   }
 }
 
 }  // namespace
 
 bool VerticalStripMatVecMPI::RunImpl() {
-  int world_size, rank;
+  int world_size = 0;
+  int rank = 0;
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  int rows = 0, cols = 0;
+  int rows = 0;
+  int cols = 0;
 
   if (rank == 0) {
     const auto &[matrix, vector] = GetInput();
@@ -189,14 +186,15 @@ bool VerticalStripMatVecMPI::RunImpl() {
   if (world_size > cols) {
     Vector result;
     if (rows > 0) {
-      result.resize(rows, 0.0);
+      result.resize(static_cast<size_t>(rows), 0.0);
     }
 
     if (rank == 0) {
       const auto &[matrix, vector] = GetInput();
       for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
-          result[i] += matrix[i][j] * vector[j];
+          result[static_cast<size_t>(i)] +=
+              matrix[static_cast<size_t>(i)][static_cast<size_t>(j)] * vector[static_cast<size_t>(j)];
         }
       }
 
@@ -213,27 +211,28 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   int base = cols / world_size;
   int rem = cols % world_size;
-  int my_start = 0, my_width = 0;
+  int my_start = 0;
+  int my_width = 0;
   GetProcessParams(rank, base, rem, my_start, my_width);
 
   std::vector<double> matrix_flat;
   if (rows > 0 && cols > 0) {
-    matrix_flat.resize(rows * cols, 0.0);
+    matrix_flat.resize(static_cast<size_t>(rows) * static_cast<size_t>(cols), 0.0);
   }
 
   Vector local_vector;
   if (my_width > 0) {
-    local_vector.resize(my_width, 0.0);
+    local_vector.resize(static_cast<size_t>(my_width), 0.0);
   }
 
   Vector local_result;
   if (rows > 0) {
-    local_result.resize(rows, 0.0);
+    local_result.resize(static_cast<size_t>(rows), 0.0);
   }
 
   Vector final_result;
   if (rows > 0) {
-    final_result.resize(rows, 0.0);
+    final_result.resize(static_cast<size_t>(rows), 0.0);
   }
 
   if (rank == 0 && rows > 0 && cols > 0) {
@@ -241,7 +240,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
     for (int i = 0; i < rows; ++i) {
       for (int j = 0; j < cols; ++j) {
-        matrix_flat[i * cols + j] = matrix[i][j];
+        matrix_flat[static_cast<size_t>((i * cols) + j)] = matrix[static_cast<size_t>(i)][static_cast<size_t>(j)];
       }
     }
   }
@@ -265,7 +264,7 @@ bool VerticalStripMatVecMPI::RunImpl() {
 
   Vector local_final_result;
   if (rows > 0) {
-    local_final_result.resize(rows, 0.0);
+    local_final_result.resize(static_cast<size_t>(rows), 0.0);
   }
 
   if (rank == 0) {

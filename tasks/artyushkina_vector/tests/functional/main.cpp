@@ -90,7 +90,7 @@ TestType CreateVectorTest(int test_id, int rows, int cols) {
 }
 
 const std::array<TestType, 7> kTestParam = {
-    std::make_tuple(1, Matrix{{1, 2}, {3, 4}}, Vector{5, 6}, Vector{1 * 5 + 2 * 6, 3 * 5 + 4 * 6}),
+    std::make_tuple(1, Matrix{{1, 2}, {3, 4}}, Vector{5, 6}, Vector{(1 * 5) + (2 * 6), (3 * 5) + (4 * 6)}),
 
     std::make_tuple(2, Matrix{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, Vector{2, 3, 4}, Vector{2, 3, 4}),
 

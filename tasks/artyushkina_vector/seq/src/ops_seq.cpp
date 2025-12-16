@@ -1,6 +1,7 @@
 #include "artyushkina_vector/seq/include/ops_seq.hpp"
 
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 #ifdef __GNUC__
@@ -58,10 +59,7 @@ bool VerticalStripMatVecSEQ::RunImpl() {
   size_t rows = matrix.size();
   size_t cols = matrix[0].size();
 
-  Vector result;
-  if (rows > 0) {
-    result.resize(rows, 0.0);
-  }
+  Vector result(rows, 0.0);
 
   for (size_t i = 0; i < rows; ++i) {
     double sum = 0.0;
