@@ -6,6 +6,8 @@
 #include <utility>
 #include <vector>
 
+#include "artyushkina_vector/common/include/common.hpp"
+
 #ifdef __GNUC__
 #  pragma GCC diagnostic push
 #  pragma GCC diagnostic ignored "-Wnull-dereference"
