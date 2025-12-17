@@ -32,7 +32,7 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-  return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
+  return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
 }
 
 bool ArtyushkinaStringMatrixSEQ::PreProcessingImpl() {
