@@ -38,6 +38,10 @@ class BellmanFordCRSFuncTests : public ppc::util::BaseRunFuncTests<InType, OutTy
     }
 
     for (size_t i = 0; i < output_data.size(); ++i) {
+      if (std::isinf(output_data[i]) && std::isinf(expected_[i])) {
+        continue;
+      }
+
       if (std::abs(output_data[i] - expected_[i]) > 1e-9) {
         return false;
       }

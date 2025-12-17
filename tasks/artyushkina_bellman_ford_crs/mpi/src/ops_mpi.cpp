@@ -101,18 +101,30 @@ bool BellmanFordCRSMPI::RunImpl() {
   MPI_Bcast(&num_edges, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
 
   if (rank != 0) {
-    row_ptr.resize(static_cast<size_t>(num_vertices + 1));
-    col_idx.resize(static_cast<size_t>(num_edges));
-    values.resize(static_cast<size_t>(num_edges));
+    if (num_vertices > 0) {
+      row_ptr.resize(static_cast<size_t>(num_vertices + 1));
+    } else {
+      row_ptr.resize(1);
+    }
+
+    if (num_edges > 0) {
+      col_idx.resize(static_cast<size_t>(num_edges));
+      values.resize(static_cast<size_t>(num_edges));
+    }
   }
 
-  if (num_vertices > 0 && num_edges > 0) {
-    MPI_Bcast(row_ptr.data(), num_vertices + 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  if (num_vertices >= 0) {
+    int row_ptr_size = (num_vertices > 0) ? (num_vertices + 1) : 1;
+    MPI_Bcast(row_ptr.data(), row_ptr_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  }
+
+  if (num_edges > 0) {
     MPI_Bcast(col_idx.data(), num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
     MPI_Bcast(values.data(), num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 
   std::vector<double> distances;
+
   if (num_vertices > 0) {
     distances.resize(static_cast<size_t>(num_vertices), std::numeric_limits<double>::infinity());
 
@@ -157,9 +169,12 @@ bool BellmanFordCRSMPI::RunImpl() {
         break;
       }
     }
+  } else {
+    distances = std::vector<double>{};
   }
 
   GetOutput() = distances;
+
   row_ptr.clear();
   row_ptr.shrink_to_fit();
   col_idx.clear();

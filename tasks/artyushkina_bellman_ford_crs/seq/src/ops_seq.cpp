@@ -16,8 +16,24 @@ BellmanFordCRSSEQ::BellmanFordCRSSEQ(const InType &in) {
 bool BellmanFordCRSSEQ::ValidationImpl() {
   const auto &graph = GetInput();
 
-  if (graph.num_vertices <= 0) {
+  if (graph.num_vertices < 0) {
     return false;
+  }
+
+  if (graph.num_vertices == 0) {
+    if (graph.source_vertex != 0) {
+      return false;
+    }
+    if (graph.row_ptr.size() != 1 || graph.row_ptr[0] != 0) {
+      return false;
+    }
+    if (graph.num_edges != 0) {
+      return false;
+    }
+    if (!graph.col_idx.empty() || !graph.values.empty()) {
+      return false;
+    }
+    return true;
   }
 
   if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
