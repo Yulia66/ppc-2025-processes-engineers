@@ -36,7 +36,7 @@ bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
     return false;
   }
 
-  return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
+  return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
 }
 
 bool ArtyushkinaStringMatrixMPI::PreProcessingImpl() {
