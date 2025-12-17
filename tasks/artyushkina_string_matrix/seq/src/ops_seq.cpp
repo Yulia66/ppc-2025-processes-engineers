@@ -32,14 +32,7 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-#if __cplusplus >= 202002L && __has_include(<ranges>)
-
-  return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
-#else
-
-  // NOLINTNEXTLINE(modernize-use-ranges)
   return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
-#endif
 }
 
 bool ArtyushkinaStringMatrixSEQ::PreProcessingImpl() {

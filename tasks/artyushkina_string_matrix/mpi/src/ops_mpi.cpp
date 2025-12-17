@@ -36,7 +36,6 @@ bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
     return false;
   }
 
-  // NOLINTNEXTLINE(modernize-use-ranges)
   return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
 }
 
@@ -63,7 +62,7 @@ std::vector<int> ArtyushkinaStringMatrixMPI::FlattenMatrix(const std::vector<std
   return flat;
 }
 
-bool ArtyushkinaStringMatrixMPI::RunImpl() {  // NOLINT(readability-function-cognitive-complexity)
+bool ArtyushkinaStringMatrixMPI::RunImpl() {
   int rank = 0;
   int size = 1;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
