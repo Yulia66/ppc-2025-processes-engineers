@@ -6,6 +6,7 @@
 #include <array>
 #include <climits>
 #include <cstddef>
+#include <ranges>
 #include <utility>
 #include <vector>
 
@@ -36,8 +37,8 @@ bool ArtyushkinaStringMatrixMPI::ValidationImpl() {
     return false;
   }
 
-  // Используем обычный all_of вместо ranges
-  return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
+  // Используем ranges - проект использует C++20
+  return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
 }
 
 bool ArtyushkinaStringMatrixMPI::PreProcessingImpl() {
@@ -144,9 +145,7 @@ std::vector<int> ArtyushkinaStringMatrixMPI::ComputeLocalMinima(const std::vecto
     for (int j = 0; j < total_cols; ++j) {
       const int index = (i * total_cols) + j;
       const int val = local_data[static_cast<std::size_t>(index)];
-      if (val < local_minima[static_cast<std::size_t>(i)]) {
-        local_minima[static_cast<std::size_t>(i)] = val;
-      }
+      local_minima[static_cast<std::size_t>(i)] = std::min(val, local_minima[static_cast<std::size_t>(i)]);
     }
   }
 

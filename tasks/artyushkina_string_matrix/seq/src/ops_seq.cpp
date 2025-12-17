@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstddef>
+#include <ranges>
 #include <vector>
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
@@ -32,7 +33,8 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-  return std::all_of(input.begin(), input.end(), [cols](const auto &row) { return row.size() == cols; });
+  // Используем ranges - проект использует C++20
+  return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
 }
 
 bool ArtyushkinaStringMatrixSEQ::PreProcessingImpl() {
