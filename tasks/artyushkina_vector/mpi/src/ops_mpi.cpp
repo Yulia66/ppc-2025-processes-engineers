@@ -4,7 +4,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <iostream>
 #include <utility>
 #include <vector>
 
@@ -85,41 +84,50 @@ std::pair<int, int> GetProcessParams(int proc, int base, int rem) {
   return {proc_start, proc_width};
 }
 
+void PrepareAndSendVectorParts(int world_size, const Vector &vector, int base, int rem,
+                               std::vector<double> &local_vector) {
+  for (int proc = 0; proc < world_size; ++proc) {
+    auto [proc_start, proc_width] = GetProcessParams(proc, base, rem);
+
+    if (proc_width <= 0) {
+      int empty_signal = -1;
+      if (proc != 0) {
+        MPI_Send(&empty_signal, 1, MPI_INT, proc, kTagEmpty, MPI_COMM_WORLD);
+      }
+      continue;
+    }
+
+    std::vector<double> sendbuf(static_cast<size_t>(proc_width));
+    for (int j = 0; j < proc_width; ++j) {
+      auto j_idx = static_cast<size_t>(j);
+      auto src_idx = static_cast<size_t>(proc_start) + j_idx;
+      sendbuf[j_idx] = vector[src_idx];
+    }
+
+    if (proc == 0) {
+      local_vector = std::move(sendbuf);
+    } else {
+      MPI_Send(sendbuf.data(), proc_width, MPI_DOUBLE, proc, kTagVector, MPI_COMM_WORLD);
+    }
+  }
+}
+
+void ReceiveVectorPart(int my_width, std::vector<double> &local_vector) {
+  if (my_width > 0) {
+    local_vector.resize(static_cast<size_t>(my_width));
+    MPI_Recv(local_vector.data(), my_width, MPI_DOUBLE, 0, kTagVector, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  } else {
+    int empty_signal = 0;
+    MPI_Recv(&empty_signal, 1, MPI_INT, 0, kTagEmpty, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+  }
+}
+
 void DistributeVectorStripes(int world_size, const Vector &vector, int base, int rem, std::vector<double> &local_vector,
                              int rank, int my_width) {
   if (rank == 0) {
-    for (int proc = 0; proc < world_size; ++proc) {
-      auto [proc_start, proc_width] = GetProcessParams(proc, base, rem);
-
-      if (proc_width <= 0) {
-        int empty_signal = -1;
-        if (proc != 0) {
-          MPI_Send(&empty_signal, 1, MPI_INT, proc, kTagEmpty, MPI_COMM_WORLD);
-        }
-        continue;
-      }
-
-      std::vector<double> sendbuf(static_cast<size_t>(proc_width));
-      for (int j = 0; j < proc_width; ++j) {
-        auto j_idx = static_cast<size_t>(j);
-        auto src_idx = static_cast<size_t>(proc_start) + j_idx;
-        sendbuf[j_idx] = vector[src_idx];
-      }
-
-      if (proc == 0) {
-        local_vector = std::move(sendbuf);
-      } else {
-        MPI_Send(sendbuf.data(), proc_width, MPI_DOUBLE, proc, kTagVector, MPI_COMM_WORLD);
-      }
-    }
+    PrepareAndSendVectorParts(world_size, vector, base, rem, local_vector);
   } else {
-    if (my_width > 0) {
-      local_vector.resize(static_cast<size_t>(my_width));
-      MPI_Recv(local_vector.data(), my_width, MPI_DOUBLE, 0, kTagVector, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    } else {
-      int empty_signal = 0;
-      MPI_Recv(&empty_signal, 1, MPI_INT, 0, kTagEmpty, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-    }
+    ReceiveVectorPart(my_width, local_vector);
   }
 }
 
@@ -140,7 +148,7 @@ void MultiplyStrip(const std::vector<double> &matrix_flat, const std::vector<dou
 void GatherResultsInRoot(int world_size, int rows, const std::vector<double> &local_result,
                          std::vector<double> &final_result) {
   if (rows > 0) {
-    std::copy(local_result.begin(), local_result.end(), final_result.begin());
+    std::ranges::copy(local_result, final_result.begin());
   }
 
   for (int proc = 1; proc < world_size; ++proc) {
@@ -153,7 +161,7 @@ void GatherResultsInRoot(int world_size, int rows, const std::vector<double> &lo
         final_result[i_idx] += recv_buf[i_idx];
       }
     } else {
-      int dummy;
+      int dummy = 0;
       MPI_Recv(&dummy, 1, MPI_INT, proc, kTagResult, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     }
   }
@@ -183,7 +191,7 @@ void BroadcastFinalResult(int rank, int world_size, const std::vector<double> &f
       local_final_result.resize(static_cast<size_t>(count));
       MPI_Recv(local_final_result.data(), count, MPI_DOUBLE, 0, kTagBroadcast, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
     } else {
-      int empty_signal;
+      int empty_signal = 0;
       MPI_Recv(&empty_signal, 1, MPI_INT, 0, kTagEmpty, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       local_final_result.clear();
     }
