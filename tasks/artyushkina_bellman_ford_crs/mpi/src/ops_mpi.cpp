@@ -10,22 +10,28 @@
 
 namespace artyushkina_bellman_ford_crs {
 
+// Глобальный флаг инициализации MPI
+namespace {
+bool mpi_initialized_globally = false;
+bool mpi_finalize_on_exit = false;
+}  // namespace
+
 BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput() = OutType{};
-  mpi_initialized_by_me = false;
+
+  // Проверяем инициализацию MPI при создании объекта
+  int initialized = 0;
+  MPI_Initialized(&initialized);
+  if (!initialized) {
+    mpi_initialized_globally = true;
+  }
 }
 
 BellmanFordCRSMPI::~BellmanFordCRSMPI() {
-  // Финализируем MPI если мы его инициализировали
-  if (mpi_initialized_by_me) {
-    int mpi_finalized = 0;
-    MPI_Finalized(&mpi_finalized);
-    if (!mpi_finalized) {
-      MPI_Finalize();
-    }
-  }
+  // Не финализируем MPI здесь, чтобы избежать проблем с Valgrind
+  // MPI должен финализироваться автоматически при выходе из программы
 }
 
 bool BellmanFordCRSMPI::ValidationImpl() {
@@ -102,13 +108,13 @@ bool BellmanFordCRSMPI::PreProcessingImpl() {
   GetOutput().clear();
   GetOutput().shrink_to_fit();
 
-  // Инициализируем MPI если еще не инициализирован
+  // Инициализация MPI только если нужно
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
   if (!mpi_initialized) {
-    int provided = 0;
-    MPI_Init_thread(nullptr, nullptr, MPI_THREAD_SINGLE, &provided);
-    mpi_initialized_by_me = true;
+    // Используем MPI_Init вместо MPI_Init_thread для простоты
+    MPI_Init(nullptr, nullptr);
+    mpi_finalize_on_exit = true;
   }
 
   return true;
@@ -118,6 +124,7 @@ bool BellmanFordCRSMPI::RunImpl() {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
+  // Если MPI не инициализирован, запускаем последовательную версию
   if (!mpi_initialized) {
     const auto &graph = GetInput();
 
@@ -184,11 +191,13 @@ bool BellmanFordCRSMPI::RunImpl() {
     return true;
   }
 
+  // MPI версия
   int world_size = 0;
   int rank = 0;
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  // Получаем данные
   int32_t num_vertices = 0;
   int32_t source_vertex = 0;
   int32_t num_edges = 0;
@@ -208,34 +217,24 @@ bool BellmanFordCRSMPI::RunImpl() {
     values = graph.values;
   }
 
+  // Распространяем данные
   MPI_Bcast(&num_vertices, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&source_vertex, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&num_edges, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
 
   if (rank != 0) {
-    if (num_vertices > 0) {
-      row_ptr.resize(static_cast<size_t>(num_vertices + 1), 0);
-    } else {
-      row_ptr.resize(1, 0);
-    }
-
-    if (num_edges > 0) {
-      col_idx.resize(static_cast<size_t>(num_edges), 0);
-      values.resize(static_cast<size_t>(num_edges), 0.0);
-    }
+    row_ptr.resize(static_cast<size_t>(num_vertices + 1));
+    col_idx.resize(static_cast<size_t>(num_edges));
+    values.resize(static_cast<size_t>(num_edges));
   }
 
   if (num_vertices > 0) {
     MPI_Bcast(row_ptr.data(), num_vertices + 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
-  } else if (num_vertices == 0) {
-    MPI_Bcast(row_ptr.data(), 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
-  }
-
-  if (num_edges > 0) {
     MPI_Bcast(col_idx.data(), num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
     MPI_Bcast(values.data(), num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 
+  // Выполняем алгоритм
   std::vector<double> distances;
 
   if (num_vertices > 0) {
@@ -248,12 +247,8 @@ bool BellmanFordCRSMPI::RunImpl() {
     for (int32_t iter = 0; iter < num_vertices - 1; ++iter) {
       bool updated = false;
 
-      for (int32_t u = 0; u < num_vertices; ++u) {
-        // Распределяем вершины по процессам
-        if (u % world_size != rank) {
-          continue;
-        }
-
+      // Каждый процесс обрабатывает свою часть вершин
+      for (int32_t u = rank; u < num_vertices; u += world_size) {
         size_t u_idx = static_cast<size_t>(u);
 
         if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
@@ -267,25 +262,16 @@ bool BellmanFordCRSMPI::RunImpl() {
         int32_t start = row_ptr[u_idx];
         int32_t end = row_ptr[u_idx + 1];
 
-        if (start < 0 || end < start || end > num_edges) {
-          continue;
-        }
-
         for (int32_t j = start; j < end; ++j) {
-          size_t j_idx = static_cast<size_t>(j);
-          if (j_idx >= col_idx.size() || j_idx >= values.size()) {
-            continue;
-          }
-
-          int32_t v = col_idx[j_idx];
-          double weight = values[j_idx];
+          int32_t v = col_idx[static_cast<size_t>(j)];
+          double weight = values[static_cast<size_t>(j)];
 
           if (v < 0 || v >= num_vertices) {
             continue;
           }
 
-          size_t v_idx = static_cast<size_t>(v);
           double new_dist = distances[u_idx] + weight;
+          size_t v_idx = static_cast<size_t>(v);
 
           if (new_dist < distances[v_idx]) {
             distances[v_idx] = new_dist;
@@ -294,15 +280,14 @@ bool BellmanFordCRSMPI::RunImpl() {
         }
       }
 
-      // Синхронизируем расстояния между всеми процессами
-      std::vector<double> global_distances(num_vertices);
+      // Синхронизируем расстояния
+      std::vector<double> global_distances(distances.size());
       MPI_Allreduce(distances.data(), global_distances.data(), num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
       distances.swap(global_distances);
 
-      // Проверяем, были ли обновления
-      int local_updated = updated ? 1 : 0;
-      int global_updated = 0;
-      MPI_Allreduce(&local_updated, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+      // Проверяем, нужно ли продолжать
+      int global_updated = updated ? 1 : 0;
+      MPI_Allreduce(MPI_IN_PLACE, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
       if (!global_updated) {
         break;
@@ -320,6 +305,17 @@ bool BellmanFordCRSMPI::PostProcessingImpl() {
   if (GetOutput().capacity() > GetOutput().size() * 2) {
     GetOutput().shrink_to_fit();
   }
+
+  // Финализируем MPI только если мы его инициализировали в PreProcessing
+  if (mpi_finalize_on_exit) {
+    int finalized = 0;
+    MPI_Finalized(&finalized);
+    if (!finalized) {
+      MPI_Finalize();
+    }
+    mpi_finalize_on_exit = false;
+  }
+
   return true;
 }
 
