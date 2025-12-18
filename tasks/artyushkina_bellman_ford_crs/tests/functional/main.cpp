@@ -139,12 +139,6 @@ std::string TestNamingFunction(
   return "Test_" + std::to_string(test_id) + "_" + task_name;
 }
 
-std::string SimpleTestNamingFunction(
-    const testing::TestParamInfo<std::tuple<std::function<std::shared_ptr<ppc::task::Task<InType, OutType>>(InType)>,
-                                            std::string, TestType>> &info) {
-  return std::to_string(info.index);
-}
-
 INSTANTIATE_TEST_SUITE_P(BellmanFordTests, BellmanFordCRSFuncTests, kGtestValues, TestNamingFunction);
 
 }  // namespace
