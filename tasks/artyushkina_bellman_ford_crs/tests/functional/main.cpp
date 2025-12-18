@@ -71,6 +71,9 @@ CRSGraph CreateEmptyGraph() {
   return graph;
 }
 
+// Объявление функции для генерации имен тестов
+std::string SEQTestNamingFunction(const testing::TestParamInfo<std::tuple<int, CRSGraph, std::vector<double>>> &info);
+
 }  // namespace
 
 // Простые тесты без сложных шаблонов
@@ -138,10 +141,15 @@ const std::array<std::tuple<int, CRSGraph, std::vector<double>>, 5> kSEQTestCase
      std::make_tuple(4, CreateSingleVertexGraph(), std::vector<double>{0.0}),
      std::make_tuple(5, CreateEmptyGraph(), std::vector<double>{})}};
 
+namespace {
+
+// Реализация функции для генерации имен тестов
 std::string SEQTestNamingFunction(const testing::TestParamInfo<std::tuple<int, CRSGraph, std::vector<double>>> &info) {
   int test_id = std::get<0>(info.param);
   return "SEQ_Test_" + std::to_string(test_id);
 }
+
+}  // namespace
 
 INSTANTIATE_TEST_SUITE_P(SEQTests, BellmanFordSEQTest, testing::ValuesIn(kSEQTestCases), SEQTestNamingFunction);
 
