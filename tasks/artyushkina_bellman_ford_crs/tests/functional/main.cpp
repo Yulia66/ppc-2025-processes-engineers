@@ -20,7 +20,7 @@ class BellmanFordCRSFuncTests : public ppc::util::BaseRunFuncTests<InType, OutTy
  public:
   static std::string PrintTestParam(const TestType &test_param) {
     int test_id = std::get<0>(test_param);
-    return "test_" + std::to_string(test_id);
+    return std::to_string(test_id);
   }
 
  protected:
@@ -73,11 +73,9 @@ CRSGraph CreateSimpleGraph() {
   graph.num_vertices = 4;
   graph.num_edges = 5;
   graph.source_vertex = 0;
-
   graph.row_ptr = {0, 2, 4, 5, 5};
   graph.col_idx = {1, 2, 2, 3, 3};
   graph.values = {1.0, 4.0, 2.0, 6.0, 3.0};
-
   return graph;
 }
 
@@ -86,11 +84,9 @@ CRSGraph CreateGraphWithNegativeWeights() {
   graph.num_vertices = 3;
   graph.num_edges = 3;
   graph.source_vertex = 0;
-
   graph.row_ptr = {0, 2, 3, 3};
   graph.col_idx = {1, 2, 2};
   graph.values = {-1.0, 4.0, 3.0};
-
   return graph;
 }
 
@@ -99,11 +95,9 @@ CRSGraph CreateDisconnectedGraph() {
   graph.num_vertices = 4;
   graph.num_edges = 2;
   graph.source_vertex = 0;
-
   graph.row_ptr = {0, 1, 1, 2, 2};
   graph.col_idx = {1, 3};
   graph.values = {1.0, 1.0};
-
   return graph;
 }
 
@@ -119,12 +113,12 @@ CRSGraph CreateSingleVertexGraph() {
 }
 
 const std::array<TestType, 4> kTestParam = {
-    std::make_tuple(1, CreateSimpleGraph(), std::vector<double>{0.0, 1.0, 3.0, 6.0}),
-    std::make_tuple(2, CreateGraphWithNegativeWeights(), std::vector<double>{0.0, -1.0, 2.0}),
-    std::make_tuple(3, CreateDisconnectedGraph(),
-                    std::vector<double>{0.0, 1.0, std::numeric_limits<double>::infinity(),
-                                        std::numeric_limits<double>::infinity()}),
-    std::make_tuple(4, CreateSingleVertexGraph(), std::vector<double>{0.0})};
+    {TestType{1, CreateSimpleGraph(), std::vector<double>{0.0, 1.0, 3.0, 6.0}},
+     TestType{2, CreateGraphWithNegativeWeights(), std::vector<double>{0.0, -1.0, 2.0}},
+     TestType{3, CreateDisconnectedGraph(),
+              std::vector<double>{0.0, 1.0, std::numeric_limits<double>::infinity(),
+                                  std::numeric_limits<double>::infinity()}},
+     TestType{4, CreateSingleVertexGraph(), std::vector<double>{0.0}}}};
 
 TEST_P(BellmanFordCRSFuncTests, BellmanFordAlgorithm) {
   ExecuteTest(GetParam());
@@ -134,9 +128,24 @@ const auto kTestTasksList =
     ppc::util::AddFuncTask<BellmanFordCRSSEQ, InType>(kTestParam, PPC_SETTINGS_artyushkina_bellman_ford_crs);
 
 const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
-const auto kPerfTestName = BellmanFordCRSFuncTests::PrintFuncTestName<BellmanFordCRSFuncTests>;
 
-INSTANTIATE_TEST_SUITE_P(BellmanFordTests, BellmanFordCRSFuncTests, kGtestValues, kPerfTestName);
+std::string TestNamingFunction(
+    const testing::TestParamInfo<std::tuple<std::function<std::shared_ptr<ppc::task::Task<InType, OutType>>(InType)>,
+                                            std::string, TestType>> &info) {
+  const auto &test_case = std::get<2>(info.param);
+  int test_id = std::get<0>(test_case);
+  const std::string &task_name = std::get<1>(info.param);
+
+  return "Test_" + std::to_string(test_id) + "_" + task_name;
+}
+
+std::string SimpleTestNamingFunction(
+    const testing::TestParamInfo<std::tuple<std::function<std::shared_ptr<ppc::task::Task<InType, OutType>>(InType)>,
+                                            std::string, TestType>> &info) {
+  return std::to_string(info.index);
+}
+
+INSTANTIATE_TEST_SUITE_P(BellmanFordTests, BellmanFordCRSFuncTests, kGtestValues, TestNamingFunction);
 
 }  // namespace
 
