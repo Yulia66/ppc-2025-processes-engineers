@@ -52,6 +52,14 @@ bool BellmanFordCRSSEQ::ValidationImpl() {
     return false;
   }
 
+  if (graph.row_ptr[0] != 0) {
+    return false;
+  }
+
+  if (graph.row_ptr[static_cast<size_t>(graph.num_vertices)] != graph.num_edges) {
+    return false;
+  }
+
   for (size_t i = 1; i < graph.row_ptr.size(); ++i) {
     if (graph.row_ptr[i] < graph.row_ptr[i - 1]) {
       return false;
@@ -69,6 +77,7 @@ bool BellmanFordCRSSEQ::ValidationImpl() {
 
 bool BellmanFordCRSSEQ::PreProcessingImpl() {
   GetOutput().clear();
+  GetOutput().shrink_to_fit();
   return true;
 }
 
@@ -81,7 +90,10 @@ bool BellmanFordCRSSEQ::RunImpl() {
   }
 
   std::vector<double> distances(static_cast<size_t>(graph.num_vertices), std::numeric_limits<double>::infinity());
-  distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
+
+  if (graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices) {
+    distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
+  }
 
   for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
     bool updated = false;
@@ -92,13 +104,29 @@ bool BellmanFordCRSSEQ::RunImpl() {
         continue;
       }
 
+      if (u_idx + 1 >= graph.row_ptr.size()) {
+        continue;
+      }
+
       int32_t start = graph.row_ptr[u_idx];
       int32_t end = graph.row_ptr[u_idx + 1];
 
+      if (start < 0 || end < start || end > graph.num_edges) {
+        continue;
+      }
+
       for (int32_t j = start; j < end; ++j) {
         size_t j_idx = static_cast<size_t>(j);
+        if (j_idx >= graph.col_idx.size() || j_idx >= graph.values.size()) {
+          continue;
+        }
+
         int32_t v = graph.col_idx[j_idx];
         double weight = graph.values[j_idx];
+
+        if (v < 0 || v >= graph.num_vertices) {
+          continue;
+        }
 
         size_t v_idx = static_cast<size_t>(v);
         double new_dist = distances[u_idx] + weight;
@@ -120,6 +148,9 @@ bool BellmanFordCRSSEQ::RunImpl() {
 }
 
 bool BellmanFordCRSSEQ::PostProcessingImpl() {
+  if (GetOutput().capacity() > GetOutput().size() * 2) {
+    GetOutput().shrink_to_fit();
+  }
   return true;
 }
 

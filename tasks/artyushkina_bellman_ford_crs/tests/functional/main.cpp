@@ -38,8 +38,21 @@ class BellmanFordCRSFuncTests : public ppc::util::BaseRunFuncTests<InType, OutTy
     }
 
     for (size_t i = 0; i < output_data.size(); ++i) {
-      if (std::isinf(output_data[i]) && std::isinf(expected_[i])) {
-        continue;
+      if (std::isnan(output_data[i]) || std::isnan(expected_[i])) {
+        return false;
+      }
+
+      bool output_is_inf = std::isinf(output_data[i]);
+      bool expected_is_inf = std::isinf(expected_[i]);
+
+      if (output_is_inf && expected_is_inf) {
+        if ((output_data[i] > 0 && expected_[i] > 0) || (output_data[i] < 0 && expected_[i] < 0)) {
+          continue;
+        } else {
+          return false;
+        }
+      } else if (output_is_inf != expected_is_inf) {
+        return false;
       }
 
       if (std::abs(output_data[i] - expected_[i]) > 1e-9) {
@@ -100,6 +113,17 @@ CRSGraph CreateDisconnectedGraph() {
   return graph;
 }
 
+CRSGraph CreateSingleVertexGraph() {
+  CRSGraph graph;
+  graph.num_vertices = 1;
+  graph.num_edges = 0;
+  graph.source_vertex = 0;
+  graph.row_ptr = {0, 0};
+  graph.col_idx = {};
+  graph.values = {};
+  return graph;
+}
+
 const std::array<TestType, 4> kTestParam = {
     std::make_tuple(1, CreateSimpleGraph(), std::vector<double>{0.0, 1.0, 3.0, 6.0}),
 
@@ -109,16 +133,7 @@ const std::array<TestType, 4> kTestParam = {
                     std::vector<double>{0.0, 1.0, std::numeric_limits<double>::infinity(),
                                         std::numeric_limits<double>::infinity()}),
 
-    std::make_tuple(4, []() {
-  CRSGraph graph;
-  graph.num_vertices = 1;
-  graph.num_edges = 0;
-  graph.source_vertex = 0;
-  graph.row_ptr = {0, 0};
-  graph.col_idx = {};
-  graph.values = {};
-  return graph;
-}(), std::vector<double>{0.0})};
+    std::make_tuple(4, CreateSingleVertexGraph(), std::vector<double>{0.0})};
 
 TEST_P(BellmanFordCRSFuncTests, BellmanFordAlgorithm) {
   ExecuteTest(GetParam());

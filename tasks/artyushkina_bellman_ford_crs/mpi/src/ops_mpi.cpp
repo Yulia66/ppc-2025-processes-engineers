@@ -37,7 +37,23 @@ bool BellmanFordCRSMPI::ValidationImpl() {
     return false;
   }
 
-  if (graph.source_vertex < 0 || (graph.num_vertices > 0 && graph.source_vertex >= graph.num_vertices)) {
+  if (graph.num_vertices == 0) {
+    if (graph.source_vertex != 0) {
+      return false;
+    }
+    if (graph.row_ptr.size() != 1 || graph.row_ptr[0] != 0) {
+      return false;
+    }
+    if (graph.num_edges != 0) {
+      return false;
+    }
+    if (!graph.col_idx.empty() || !graph.values.empty()) {
+      return false;
+    }
+    return true;
+  }
+
+  if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
     return false;
   }
 
@@ -47,6 +63,14 @@ bool BellmanFordCRSMPI::ValidationImpl() {
 
   if (graph.col_idx.size() != static_cast<size_t>(graph.num_edges) ||
       graph.values.size() != static_cast<size_t>(graph.num_edges)) {
+    return false;
+  }
+
+  if (graph.row_ptr[0] != 0) {
+    return false;
+  }
+
+  if (graph.row_ptr[static_cast<size_t>(graph.num_vertices)] != graph.num_edges) {
     return false;
   }
 
@@ -102,20 +126,21 @@ bool BellmanFordCRSMPI::RunImpl() {
 
   if (rank != 0) {
     if (num_vertices > 0) {
-      row_ptr.resize(static_cast<size_t>(num_vertices + 1));
+      row_ptr.resize(static_cast<size_t>(num_vertices + 1), 0);
     } else {
-      row_ptr.resize(1);
+      row_ptr.resize(1, 0);
     }
 
     if (num_edges > 0) {
-      col_idx.resize(static_cast<size_t>(num_edges));
-      values.resize(static_cast<size_t>(num_edges));
+      col_idx.resize(static_cast<size_t>(num_edges), 0);
+      values.resize(static_cast<size_t>(num_edges), 0.0);
     }
   }
 
-  if (num_vertices >= 0) {
-    int row_ptr_size = (num_vertices > 0) ? (num_vertices + 1) : 1;
-    MPI_Bcast(row_ptr.data(), row_ptr_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  if (num_vertices > 0) {
+    MPI_Bcast(row_ptr.data(), num_vertices + 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  } else if (num_vertices == 0) {
+    MPI_Bcast(row_ptr.data(), 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
   }
 
   if (num_edges > 0) {
@@ -135,20 +160,40 @@ bool BellmanFordCRSMPI::RunImpl() {
     for (int32_t iter = 0; iter < num_vertices - 1; ++iter) {
       bool updated = false;
 
-      for (int32_t u = rank; u < num_vertices; u += world_size) {
+      for (int32_t u = 0; u < num_vertices; ++u) {
+        if (static_cast<uint32_t>(u % world_size) != static_cast<uint32_t>(rank)) {
+          continue;
+        }
+
         size_t u_idx = static_cast<size_t>(u);
 
         if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
           continue;
         }
 
+        if (u_idx + 1 >= row_ptr.size()) {
+          continue;
+        }
+
         int32_t start = row_ptr[u_idx];
         int32_t end = row_ptr[u_idx + 1];
 
+        if (start < 0 || end < start || end > num_edges) {
+          continue;
+        }
+
         for (int32_t j = start; j < end; ++j) {
           size_t j_idx = static_cast<size_t>(j);
+          if (j_idx >= col_idx.size() || j_idx >= values.size()) {
+            continue;
+          }
+
           int32_t v = col_idx[j_idx];
           double weight = values[j_idx];
+
+          if (v < 0 || v >= num_vertices) {
+            continue;
+          }
 
           size_t v_idx = static_cast<size_t>(v);
           double new_dist = distances[u_idx] + weight;
@@ -174,13 +219,6 @@ bool BellmanFordCRSMPI::RunImpl() {
   }
 
   GetOutput() = distances;
-
-  row_ptr.clear();
-  row_ptr.shrink_to_fit();
-  col_idx.clear();
-  col_idx.shrink_to_fit();
-  values.clear();
-  values.shrink_to_fit();
 
   return true;
 }
