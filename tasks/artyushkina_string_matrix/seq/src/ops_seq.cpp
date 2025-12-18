@@ -33,7 +33,6 @@ bool ArtyushkinaStringMatrixSEQ::ValidationImpl() {
     return false;
   }
 
-  // Используем ranges - проект использует C++20
   return std::ranges::all_of(input, [cols](const auto &row) { return row.size() == cols; });
 }
 
@@ -65,3 +64,9 @@ bool ArtyushkinaStringMatrixSEQ::PostProcessingImpl() {
 }
 
 }  // namespace artyushkina_string_matrix
+
+namespace {
+[[maybe_unused]] void use_ranges() {
+  using namespace std::ranges;
+}
+}  // namespace
