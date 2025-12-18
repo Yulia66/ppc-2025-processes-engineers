@@ -10,28 +10,14 @@
 
 namespace artyushkina_bellman_ford_crs {
 
-// Глобальный флаг инициализации MPI
-namespace {
-bool mpi_initialized_globally = false;
-bool mpi_finalize_on_exit = false;
-}  // namespace
-
 BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput() = OutType{};
-
-  // Проверяем инициализацию MPI при создании объекта
-  int initialized = 0;
-  MPI_Initialized(&initialized);
-  if (!initialized) {
-    mpi_initialized_globally = true;
-  }
 }
 
 BellmanFordCRSMPI::~BellmanFordCRSMPI() {
-  // Не финализируем MPI здесь, чтобы избежать проблем с Valgrind
-  // MPI должен финализироваться автоматически при выходе из программы
+  // Деструктор пустой, MPI финализируется в PostProcessingImpl
 }
 
 bool BellmanFordCRSMPI::ValidationImpl() {
@@ -108,13 +94,11 @@ bool BellmanFordCRSMPI::PreProcessingImpl() {
   GetOutput().clear();
   GetOutput().shrink_to_fit();
 
-  // Инициализация MPI только если нужно
+  // Инициализация MPI если нужно
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
   if (!mpi_initialized) {
-    // Используем MPI_Init вместо MPI_Init_thread для простоты
     MPI_Init(nullptr, nullptr);
-    mpi_finalize_on_exit = true;
   }
 
   return true;
@@ -306,14 +290,15 @@ bool BellmanFordCRSMPI::PostProcessingImpl() {
     GetOutput().shrink_to_fit();
   }
 
-  // Финализируем MPI только если мы его инициализировали в PreProcessing
-  if (mpi_finalize_on_exit) {
-    int finalized = 0;
-    MPI_Finalized(&finalized);
-    if (!finalized) {
+  // Финализируем MPI если он был инициализирован
+  int mpi_initialized = 0;
+  MPI_Initialized(&mpi_initialized);
+  if (mpi_initialized) {
+    int mpi_finalized = 0;
+    MPI_Finalized(&mpi_finalized);
+    if (!mpi_finalized) {
       MPI_Finalize();
     }
-    mpi_finalize_on_exit = false;
   }
 
   return true;

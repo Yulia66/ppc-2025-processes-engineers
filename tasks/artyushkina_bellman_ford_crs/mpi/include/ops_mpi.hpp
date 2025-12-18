@@ -20,7 +20,8 @@ class BellmanFordCRSMPI : public BaseTask {
   bool RunImpl() override;
   bool PostProcessingImpl() override;
 
-  bool mpi_initialized_by_me{false};
+  // Удаляем неиспользуемое поле или помечаем как [[maybe_unused]]
+  // bool mpi_initialized_by_me{false}; // Удалить эту строку
 };
 
 }  // namespace artyushkina_bellman_ford_crs
