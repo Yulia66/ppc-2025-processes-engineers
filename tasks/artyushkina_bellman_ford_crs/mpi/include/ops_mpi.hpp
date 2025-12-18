@@ -12,13 +12,14 @@ class BellmanFordCRSMPI : public BaseTask {
   }
   explicit BellmanFordCRSMPI(const InType &in);
 
+  ~BellmanFordCRSMPI();
+
  private:
   bool ValidationImpl() override;
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
 
-  // Добавляем флаг для отслеживания инициализации MPI
   bool mpi_initialized_by_me{false};
 };
 
