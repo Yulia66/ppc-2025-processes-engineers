@@ -17,27 +17,17 @@ BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
 }
 
 bool BellmanFordCRSMPI::ValidationImpl() {
-  // Пробуем инициализировать MPI, если он еще не инициализирован
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
-
-  if (!mpi_initialized) {
-    // Попробуем инициализировать MPI для тестового окружения
-    int provided;
-    if (MPI_Init_thread(nullptr, nullptr, MPI_THREAD_SINGLE, &provided) != MPI_SUCCESS) {
-      // Если не удалось инициализировать, все равно продолжим валидацию
-      // Это может быть тестовое окружение без MPI
-    }
-    MPI_Initialized(&mpi_initialized);
-  }
 
   int rank = 0;
   if (mpi_initialized) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank != 0) {
+      return true;
+    }
   }
 
-  // Валидация данных графа должна выполняться на всех процессах или только на процессе 0
-  // Для простоты выполняем на всех, но в реальности можно делать только на процессе 0
   const auto &graph = GetInput();
 
   if (graph.num_vertices < 0) {
@@ -103,14 +93,73 @@ bool BellmanFordCRSMPI::PreProcessingImpl() {
 }
 
 bool BellmanFordCRSMPI::RunImpl() {
-  // Убедимся, что MPI инициализирован
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
   if (!mpi_initialized) {
-    // Если MPI не инициализирован, инициализируем его
-    int provided;
-    MPI_Init_thread(nullptr, nullptr, MPI_THREAD_SINGLE, &provided);
+    const auto &graph = GetInput();
+
+    if (graph.num_vertices <= 0) {
+      GetOutput() = std::vector<double>{};
+      return true;
+    }
+
+    std::vector<double> distances(static_cast<size_t>(graph.num_vertices), std::numeric_limits<double>::infinity());
+
+    if (graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices) {
+      distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
+    }
+
+    for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
+      bool updated = false;
+
+      for (int32_t u = 0; u < graph.num_vertices; ++u) {
+        size_t u_idx = static_cast<size_t>(u);
+        if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
+          continue;
+        }
+
+        if (u_idx + 1 >= graph.row_ptr.size()) {
+          continue;
+        }
+
+        int32_t start = graph.row_ptr[u_idx];
+        int32_t end = graph.row_ptr[u_idx + 1];
+
+        if (start < 0 || end < start || end > graph.num_edges) {
+          continue;
+        }
+
+        for (int32_t j = start; j < end; ++j) {
+          size_t j_idx = static_cast<size_t>(j);
+          if (j_idx >= graph.col_idx.size() || j_idx >= graph.values.size()) {
+            continue;
+          }
+
+          int32_t v = graph.col_idx[j_idx];
+          double weight = graph.values[j_idx];
+
+          if (v < 0 || v >= graph.num_vertices) {
+            continue;
+          }
+
+          size_t v_idx = static_cast<size_t>(v);
+          double new_dist = distances[u_idx] + weight;
+
+          if (new_dist < distances[v_idx]) {
+            distances[v_idx] = new_dist;
+            updated = true;
+          }
+        }
+      }
+
+      if (!updated) {
+        break;
+      }
+    }
+
+    GetOutput() = distances;
+    return true;
   }
 
   int world_size = 0;
@@ -236,9 +285,6 @@ bool BellmanFordCRSMPI::RunImpl() {
   }
 
   GetOutput() = distances;
-
-  // Не финализируем MPI, так как это может быть сделано тестовой системой
-  // MPI_Finalize();
 
   return true;
 }
