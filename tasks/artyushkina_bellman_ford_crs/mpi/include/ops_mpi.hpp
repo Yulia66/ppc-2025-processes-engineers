@@ -19,8 +19,6 @@ class BellmanFordCRSMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
-
-  // НИКАКИХ ЛИШНИХ ПОЛЕЙ!
 };
 
 }  // namespace artyushkina_bellman_ford_crs

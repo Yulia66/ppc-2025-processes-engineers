@@ -10,12 +10,10 @@
 
 namespace artyushkina_bellman_ford_crs {
 
-// SEQ performance тест
 TEST(BellmanFordPerformance, SequentialSmallGraph) {
   const int num_vertices = 50;
   const int edges_per_vertex = 3;
 
-  // Создаем граф inline
   CRSGraph graph;
   graph.num_vertices = num_vertices;
   graph.source_vertex = 0;
@@ -53,13 +51,11 @@ TEST(BellmanFordPerformance, SequentialSmallGraph) {
   std::cout << "SEQ Time for " << num_vertices << " vertices: " << duration.count() << " microseconds" << std::endl;
 }
 
-// MPI performance тест - только если не под Valgrind
 #ifndef RUNNING_UNDER_VALGRIND
 TEST(BellmanFordPerformance, MPISmallGraph) {
   const int num_vertices = 50;
   const int edges_per_vertex = 3;
 
-  // Создаем граф inline (повторяем код для каждого теста)
   CRSGraph graph;
   graph.num_vertices = num_vertices;
   graph.source_vertex = 0;

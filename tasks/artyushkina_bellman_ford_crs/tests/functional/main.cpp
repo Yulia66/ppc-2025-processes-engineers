@@ -71,7 +71,6 @@ CRSGraph CreateEmptyGraph() {
   return graph;
 }
 
-// Простая функция для сравнения результатов
 bool CompareResults(const std::vector<double> &actual, const std::vector<double> &expected) {
   if (actual.size() != expected.size()) {
     return false;
@@ -104,7 +103,6 @@ bool CompareResults(const std::vector<double> &actual, const std::vector<double>
 
 }  // namespace
 
-// SEQ тесты - простые, без параметризации
 TEST(BellmanFordSEQTest, SimpleGraph) {
   CRSGraph graph = CreateSimpleGraph();
   BellmanFordCRSSEQ algorithm(graph);
@@ -169,13 +167,10 @@ TEST(BellmanFordSEQTest, EmptyGraph) {
   EXPECT_TRUE(result.empty());
 }
 
-// MPI тесты - только базовые, чтобы избежать проблем с Valgrind
 TEST(BellmanFordMPITest, SimpleGraphBasic) {
-  // Проверяем только, что алгоритм не падает
   CRSGraph graph = CreateSimpleGraph();
   BellmanFordCRSMPI algorithm(graph);
 
-// Пропускаем проверку под Valgrind
 #ifndef RUNNING_UNDER_VALGRIND
   EXPECT_TRUE(algorithm.Validation());
   algorithm.Run();

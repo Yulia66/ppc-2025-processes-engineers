@@ -16,9 +16,7 @@ BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   GetOutput() = OutType{};
 }
 
-BellmanFordCRSMPI::~BellmanFordCRSMPI() {
-  // Деструктор пустой, MPI финализируется в PostProcessingImpl
-}
+BellmanFordCRSMPI::~BellmanFordCRSMPI() {}
 
 bool BellmanFordCRSMPI::ValidationImpl() {
   int mpi_initialized = 0;
@@ -94,7 +92,6 @@ bool BellmanFordCRSMPI::PreProcessingImpl() {
   GetOutput().clear();
   GetOutput().shrink_to_fit();
 
-  // Инициализация MPI если нужно
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
   if (!mpi_initialized) {
@@ -108,7 +105,6 @@ bool BellmanFordCRSMPI::RunImpl() {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
-  // Если MPI не инициализирован, запускаем последовательную версию
   if (!mpi_initialized) {
     const auto &graph = GetInput();
 
@@ -175,13 +171,11 @@ bool BellmanFordCRSMPI::RunImpl() {
     return true;
   }
 
-  // MPI версия
   int world_size = 0;
   int rank = 0;
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  // Получаем данные
   int32_t num_vertices = 0;
   int32_t source_vertex = 0;
   int32_t num_edges = 0;
@@ -201,7 +195,6 @@ bool BellmanFordCRSMPI::RunImpl() {
     values = graph.values;
   }
 
-  // Распространяем данные
   MPI_Bcast(&num_vertices, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&source_vertex, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
   MPI_Bcast(&num_edges, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
@@ -218,7 +211,6 @@ bool BellmanFordCRSMPI::RunImpl() {
     MPI_Bcast(values.data(), num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 
-  // Выполняем алгоритм
   std::vector<double> distances;
 
   if (num_vertices > 0) {
@@ -231,7 +223,6 @@ bool BellmanFordCRSMPI::RunImpl() {
     for (int32_t iter = 0; iter < num_vertices - 1; ++iter) {
       bool updated = false;
 
-      // Каждый процесс обрабатывает свою часть вершин
       for (int32_t u = rank; u < num_vertices; u += world_size) {
         size_t u_idx = static_cast<size_t>(u);
 
@@ -264,12 +255,10 @@ bool BellmanFordCRSMPI::RunImpl() {
         }
       }
 
-      // Синхронизируем расстояния
       std::vector<double> global_distances(distances.size());
       MPI_Allreduce(distances.data(), global_distances.data(), num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
       distances.swap(global_distances);
 
-      // Проверяем, нужно ли продолжать
       int global_updated = updated ? 1 : 0;
       MPI_Allreduce(MPI_IN_PLACE, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
@@ -290,7 +279,6 @@ bool BellmanFordCRSMPI::PostProcessingImpl() {
     GetOutput().shrink_to_fit();
   }
 
-  // Финализируем MPI если он был инициализирован
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
   if (mpi_initialized) {
