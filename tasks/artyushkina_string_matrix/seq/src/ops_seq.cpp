@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <climits>
 #include <cstddef>
-#include <ranges>
+#include <ranges>  // IWYU pragma: keep
 #include <vector>
 
 #include "artyushkina_string_matrix/common/include/common.hpp"
@@ -64,9 +64,3 @@ bool ArtyushkinaStringMatrixSEQ::PostProcessingImpl() {
 }
 
 }  // namespace artyushkina_string_matrix
-
-namespace {
-[[maybe_unused]] void use_ranges() {
-  using namespace std::ranges;
-}
-}  // namespace

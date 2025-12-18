@@ -23,7 +23,6 @@ class ArtyushkinaStringMatrixMPI : public BaseTask {
   bool RunImpl() override;
   bool PostProcessingImpl() override;
 
-  // Вспомогательные методы
   static std::pair<int, int> PrepareDimensions(const std::vector<std::vector<int>> &matrix, int rank, int &size);
   static std::pair<int, int> CalculateProcessInfo(int total_rows, int size, int rank);
   static std::vector<int> ScatterData(const std::vector<std::vector<int>> &matrix, int total_rows, int total_cols,

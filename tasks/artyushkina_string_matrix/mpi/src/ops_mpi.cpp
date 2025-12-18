@@ -6,7 +6,7 @@
 #include <array>
 #include <climits>
 #include <cstddef>
-#include <ranges>
+#include <ranges>  // IWYU pragma: keep
 #include <utility>
 #include <vector>
 
@@ -221,9 +221,3 @@ bool ArtyushkinaStringMatrixMPI::PostProcessingImpl() {
 }
 
 }  // namespace artyushkina_string_matrix
-
-namespace {
-[[maybe_unused]] void use_ranges() {
-  using namespace std::ranges;
-}
-}  // namespace
