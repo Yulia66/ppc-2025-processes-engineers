@@ -89,6 +89,16 @@ bool BellmanFordCRSMPI::ValidationImpl() {
 bool BellmanFordCRSMPI::PreProcessingImpl() {
   GetOutput().clear();
   GetOutput().shrink_to_fit();
+
+  // Инициализируем MPI если еще не инициализирован
+  int mpi_initialized = 0;
+  MPI_Initialized(&mpi_initialized);
+  if (!mpi_initialized) {
+    int provided = 0;
+    MPI_Init_thread(nullptr, nullptr, MPI_THREAD_SINGLE, &provided);
+    mpi_initialized_by_me = true;
+  }
+
   return true;
 }
 
@@ -97,6 +107,7 @@ bool BellmanFordCRSMPI::RunImpl() {
   MPI_Initialized(&mpi_initialized);
 
   if (!mpi_initialized) {
+    // Запуск последовательной версии если MPI не инициализирован
     const auto &graph = GetInput();
 
     if (graph.num_vertices <= 0) {
@@ -223,11 +234,14 @@ bool BellmanFordCRSMPI::RunImpl() {
       distances[static_cast<size_t>(source_vertex)] = 0.0;
     }
 
+    // Исправляем распределение вершин по процессам
     for (int32_t iter = 0; iter < num_vertices - 1; ++iter) {
       bool updated = false;
 
+      // Локальное обновление для каждой вершины
       for (int32_t u = 0; u < num_vertices; ++u) {
-        if (static_cast<uint32_t>(u % world_size) != static_cast<uint32_t>(rank)) {
+        // Распределяем вершины по процессам
+        if (u % world_size != rank) {
           continue;
         }
 
@@ -264,6 +278,7 @@ bool BellmanFordCRSMPI::RunImpl() {
           size_t v_idx = static_cast<size_t>(v);
           double new_dist = distances[u_idx] + weight;
 
+          // Локальное обновление
           if (new_dist < distances[v_idx]) {
             distances[v_idx] = new_dist;
             updated = true;
@@ -271,10 +286,15 @@ bool BellmanFordCRSMPI::RunImpl() {
         }
       }
 
-      MPI_Allreduce(MPI_IN_PLACE, distances.data(), num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+      // Синхронизация расстояний между процессами
+      std::vector<double> global_distances = distances;
+      MPI_Allreduce(distances.data(), global_distances.data(), num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+      distances = std::move(global_distances);
 
-      int global_updated = updated ? 1 : 0;
-      MPI_Allreduce(MPI_IN_PLACE, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+      // Проверка обновлений
+      int local_updated = updated ? 1 : 0;
+      int global_updated = 0;
+      MPI_Allreduce(&local_updated, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
       if (!global_updated) {
         break;
@@ -293,6 +313,13 @@ bool BellmanFordCRSMPI::PostProcessingImpl() {
   if (GetOutput().capacity() > GetOutput().size() * 2) {
     GetOutput().shrink_to_fit();
   }
+
+  // Финализируем MPI если мы его инициализировали
+  if (mpi_initialized_by_me) {
+    MPI_Finalize();
+    mpi_initialized_by_me = false;
+  }
+
   return true;
 }
 

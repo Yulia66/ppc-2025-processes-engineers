@@ -112,34 +112,124 @@ CRSGraph CreateSingleVertexGraph() {
   return graph;
 }
 
-const std::array<TestType, 4> kTestParam = {
+CRSGraph CreateEmptyGraph() {
+  CRSGraph graph;
+  graph.num_vertices = 0;
+  graph.num_edges = 0;
+  graph.source_vertex = 0;
+  graph.row_ptr = {0};
+  graph.col_idx = {};
+  graph.values = {};
+  return graph;
+}
+
+const std::array<TestType, 5> kTestParam = {
     {TestType{1, CreateSimpleGraph(), std::vector<double>{0.0, 1.0, 3.0, 6.0}},
      TestType{2, CreateGraphWithNegativeWeights(), std::vector<double>{0.0, -1.0, 2.0}},
      TestType{3, CreateDisconnectedGraph(),
               std::vector<double>{0.0, 1.0, std::numeric_limits<double>::infinity(),
                                   std::numeric_limits<double>::infinity()}},
-     TestType{4, CreateSingleVertexGraph(), std::vector<double>{0.0}}}};
+     TestType{4, CreateSingleVertexGraph(), std::vector<double>{0.0}},
+     TestType{5, CreateEmptyGraph(), std::vector<double>{}}}};
 
 TEST_P(BellmanFordCRSFuncTests, BellmanFordAlgorithm) {
   ExecuteTest(GetParam());
 }
 
-const auto kTestTasksList =
-    ppc::util::AddFuncTask<BellmanFordCRSSEQ, InType>(kTestParam, PPC_SETTINGS_artyushkina_bellman_ford_crs);
+// Создаем тип для фабрики задач
+using TaskFactoryType = std::function<std::shared_ptr<ppc::task::Task<InType, OutType>>(InType)>;
 
-const auto kGtestValues = ppc::util::ExpandToValues(kTestTasksList);
+// Создаем список тестовых данных
+const auto kTestData = std::make_tuple(
+    // SEQ тесты
+    std::make_tuple(
+        [](const InType &in) -> std::shared_ptr<ppc::task::Task<InType, OutType>> {
+  return std::make_shared<BellmanFordCRSSEQ>(in);
+}, "seq",
+        std::array<TestType, 5>{{TestType{1, CreateSimpleGraph(), std::vector<double>{0.0, 1.0, 3.0, 6.0}},
+                                 TestType{2, CreateGraphWithNegativeWeights(), std::vector<double>{0.0, -1.0, 2.0}},
+                                 TestType{3, CreateDisconnectedGraph(),
+                                          std::vector<double>{0.0, 1.0, std::numeric_limits<double>::infinity(),
+                                                              std::numeric_limits<double>::infinity()}},
+                                 TestType{4, CreateSingleVertexGraph(), std::vector<double>{0.0}},
+                                 TestType{5, CreateEmptyGraph(), std::vector<double>{}}}})
+    // Можно добавить MPI тесты здесь, если нужно
+);
 
-std::string TestNamingFunction(
-    const testing::TestParamInfo<std::tuple<std::function<std::shared_ptr<ppc::task::Task<InType, OutType>>(InType)>,
-                                            std::string, TestType>> &info) {
-  const auto &test_case = std::get<2>(info.param);
-  int test_id = std::get<0>(test_case);
-  const std::string &task_name = std::get<1>(info.param);
+// Альтернативный подход - простые тесты без сложных шаблонов
+class BellmanFordSEQTest : public ::testing::TestWithParam<TestType> {
+ protected:
+  void SetUp() override {
+    test_param_ = GetParam();
+    input_data_ = std::get<1>(test_param_);
+    expected_ = std::get<2>(test_param_);
+  }
 
-  return "Test_" + std::to_string(test_id) + "_" + task_name;
+  bool CheckOutput(const OutType &output) {
+    if (output.size() != expected_.size()) {
+      return false;
+    }
+
+    for (size_t i = 0; i < output.size(); ++i) {
+      if (std::isnan(output[i]) || std::isnan(expected_[i])) {
+        return false;
+      }
+
+      bool output_is_inf = std::isinf(output[i]);
+      bool expected_is_inf = std::isinf(expected_[i]);
+
+      if (output_is_inf && expected_is_inf) {
+        continue;
+      } else if (output_is_inf != expected_is_inf) {
+        return false;
+      }
+
+      if (std::abs(output[i] - expected_[i]) > 1e-9) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  TestType test_param_;
+  InType input_data_;
+  OutType expected_;
+};
+
+TEST_P(BellmanFordSEQTest, SimpleBellmanFord) {
+  BellmanFordCRSSEQ algorithm(input_data_);
+
+  // Проверяем валидацию
+  EXPECT_TRUE(algorithm.Validation());
+
+  // Запускаем алгоритм
+  algorithm.Run();
+
+  // Получаем результат
+  auto output = algorithm.GetOutput();
+
+  // Проверяем результат
+  EXPECT_TRUE(CheckOutput(output));
 }
 
-INSTANTIATE_TEST_SUITE_P(BellmanFordTests, BellmanFordCRSFuncTests, kGtestValues, TestNamingFunction);
+// Определяем тестовые случаи для SEQ
+const std::array<TestType, 5> kSEQTestCases = {
+    {TestType{1, CreateSimpleGraph(), std::vector<double>{0.0, 1.0, 3.0, 6.0}},
+     TestType{2, CreateGraphWithNegativeWeights(), std::vector<double>{0.0, -1.0, 2.0}},
+     TestType{3, CreateDisconnectedGraph(),
+              std::vector<double>{0.0, 1.0, std::numeric_limits<double>::infinity(),
+                                  std::numeric_limits<double>::infinity()}},
+     TestType{4, CreateSingleVertexGraph(), std::vector<double>{0.0}},
+     TestType{5, CreateEmptyGraph(), std::vector<double>{}}}};
+
+// Функция для генерации имен тестов
+std::string TestNamingFunctionSEQ(const testing::TestParamInfo<TestType> &info) {
+  int test_id = std::get<0>(info.param);
+  return "SEQ_Test_" + std::to_string(test_id);
+}
+
+INSTANTIATE_TEST_SUITE_P(SEQTests, BellmanFordSEQTest, testing::ValuesIn(kSEQTestCases), TestNamingFunctionSEQ);
 
 }  // namespace
 

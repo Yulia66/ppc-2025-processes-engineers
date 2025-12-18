@@ -17,6 +17,9 @@ class BellmanFordCRSMPI : public BaseTask {
   bool PreProcessingImpl() override;
   bool RunImpl() override;
   bool PostProcessingImpl() override;
+
+  // Добавляем флаг для отслеживания инициализации MPI
+  bool mpi_initialized_by_me{false};
 };
 
 }  // namespace artyushkina_bellman_ford_crs
