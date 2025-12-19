@@ -2,7 +2,6 @@
 
 #include <mpi.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -12,10 +11,10 @@ namespace artyushkina_bellman_ford_crs {
 
 namespace {
 
-bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::vector<int32_t> &col_idx,
+bool ProcessVertex(int32_t vertex, const std::vector<int32_t> &row_ptr, const std::vector<int32_t> &col_idx,
                    const std::vector<double> &values, std::vector<double> &distances, int32_t num_vertices,
                    int32_t num_edges) {
-  const size_t u_idx = static_cast<size_t>(u);
+  const auto u_idx = static_cast<size_t>(vertex);
 
   if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
     return false;
@@ -34,7 +33,7 @@ bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::ve
 
   bool updated = false;
   for (int32_t j = start; j < end; ++j) {
-    const size_t j_idx = static_cast<size_t>(j);
+    const auto j_idx = static_cast<size_t>(j);
     if (j_idx >= col_idx.size() || j_idx >= values.size()) {
       continue;
     }
@@ -46,7 +45,7 @@ bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::ve
       continue;
     }
 
-    const size_t v_idx = static_cast<size_t>(v);
+    const auto v_idx = static_cast<size_t>(v);
     const double new_dist = distances[u_idx] + weight;
 
     if (new_dist < distances[v_idx]) {
@@ -72,8 +71,8 @@ std::vector<double> RunSequentialVersion(const InType &graph) {
   for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
     bool updated = false;
 
-    for (int32_t u = 0; u < graph.num_vertices; ++u) {
-      if (ProcessVertex(u, graph.row_ptr, graph.col_idx, graph.values, distances, graph.num_vertices,
+    for (int32_t vertex = 0; vertex < graph.num_vertices; ++vertex) {
+      if (ProcessVertex(vertex, graph.row_ptr, graph.col_idx, graph.values, distances, graph.num_vertices,
                         graph.num_edges)) {
         updated = true;
       }
@@ -95,38 +94,14 @@ BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   GetOutput() = OutType{};
 }
 
-bool BellmanFordCRSMPI::ValidationImpl() {
-  int mpi_initialized = 0;
-  MPI_Initialized(&mpi_initialized);
-
-  int rank = 0;
-  if (mpi_initialized != 0) {
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    if (rank != 0) {
-      return true;
-    }
-  }
-
-  const auto &graph = GetInput();
-
+static bool ValidateCRSGraph(const CRSGraph &graph) {
   if (graph.num_vertices < 0) {
     return false;
   }
 
   if (graph.num_vertices == 0) {
-    if (graph.source_vertex != 0) {
-      return false;
-    }
-    if (graph.row_ptr.size() != 1 || graph.row_ptr[0] != 0) {
-      return false;
-    }
-    if (graph.num_edges != 0) {
-      return false;
-    }
-    if (!graph.col_idx.empty() || !graph.values.empty()) {
-      return false;
-    }
-    return true;
+    return graph.source_vertex == 0 && graph.row_ptr.size() == 1 && graph.row_ptr[0] == 0 && graph.num_edges == 0 &&
+           graph.col_idx.empty() && graph.values.empty();
   }
 
   if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
@@ -164,6 +139,21 @@ bool BellmanFordCRSMPI::ValidationImpl() {
   }
 
   return true;
+}
+
+bool BellmanFordCRSMPI::ValidationImpl() {
+  int mpi_initialized = 0;
+  MPI_Initialized(&mpi_initialized);
+
+  int rank = 0;
+  if (mpi_initialized != 0) {
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rank != 0) {
+      return true;
+    }
+  }
+
+  return ValidateCRSGraph(GetInput());
 }
 
 bool BellmanFordCRSMPI::PreProcessingImpl() {
@@ -242,8 +232,8 @@ bool BellmanFordCRSMPI::RunImpl() {
     for (int32_t iter = 0; iter < num_vertices - 1; ++iter) {
       bool updated = false;
 
-      for (int32_t u = rank; u < num_vertices; u += world_size) {
-        if (ProcessVertex(u, row_ptr, col_idx, values, distances, num_vertices, num_edges)) {
+      for (int32_t vertex = rank; vertex < num_vertices; vertex += world_size) {
+        if (ProcessVertex(vertex, row_ptr, col_idx, values, distances, num_vertices, num_edges)) {
           updated = true;
         }
       }
