@@ -15,7 +15,7 @@ namespace {
 bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::vector<int32_t> &col_idx,
                    const std::vector<double> &values, std::vector<double> &distances, int32_t num_vertices,
                    int32_t num_edges) {
-  size_t u_idx = static_cast<size_t>(u);
+  const size_t u_idx = static_cast<size_t>(u);
 
   if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
     return false;
@@ -25,8 +25,8 @@ bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::ve
     return false;
   }
 
-  int32_t start = row_ptr[u_idx];
-  int32_t end = row_ptr[u_idx + 1];
+  const int32_t start = row_ptr[u_idx];
+  const int32_t end = row_ptr[u_idx + 1];
 
   if (start < 0 || end < start || end > num_edges) {
     return false;
@@ -34,20 +34,20 @@ bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::ve
 
   bool updated = false;
   for (int32_t j = start; j < end; ++j) {
-    size_t j_idx = static_cast<size_t>(j);
+    const size_t j_idx = static_cast<size_t>(j);
     if (j_idx >= col_idx.size() || j_idx >= values.size()) {
       continue;
     }
 
-    int32_t v = col_idx[j_idx];
-    double weight = values[j_idx];
+    const int32_t v = col_idx[j_idx];
+    const double weight = values[j_idx];
 
     if (v < 0 || v >= num_vertices) {
       continue;
     }
 
-    size_t v_idx = static_cast<size_t>(v);
-    double new_dist = distances[u_idx] + weight;
+    const size_t v_idx = static_cast<size_t>(v);
+    const double new_dist = distances[u_idx] + weight;
 
     if (new_dist < distances[v_idx]) {
       distances[v_idx] = new_dist;
@@ -100,7 +100,7 @@ bool BellmanFordCRSMPI::ValidationImpl() {
   MPI_Initialized(&mpi_initialized);
 
   int rank = 0;
-  if (mpi_initialized) {
+  if (mpi_initialized != 0) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank != 0) {
       return true;
@@ -133,7 +133,8 @@ bool BellmanFordCRSMPI::ValidationImpl() {
     return false;
   }
 
-  if (graph.row_ptr.size() != static_cast<size_t>(graph.num_vertices + 1)) {
+  const size_t expected_row_ptr_size = static_cast<size_t>(graph.num_vertices) + 1;
+  if (graph.row_ptr.size() != expected_row_ptr_size) {
     return false;
   }
 
@@ -175,7 +176,7 @@ bool BellmanFordCRSMPI::RunImpl() {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
-  if (!mpi_initialized) {
+  if (mpi_initialized == 0) {
     GetOutput() = RunSequentialVersion(GetInput());
     return true;
   }
@@ -208,16 +209,18 @@ bool BellmanFordCRSMPI::RunImpl() {
   MPI_Bcast(&num_edges, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
 
   if (rank != 0) {
-    const size_t row_ptr_size = (num_vertices > 0) ? static_cast<size_t>(num_vertices + 1) : 1;
-    const size_t data_size = static_cast<size_t>(num_edges);
+    const size_t row_ptr_size = (num_vertices > 0) ? static_cast<size_t>(num_vertices) + 1 : 1;
+    const auto data_size = static_cast<size_t>(num_edges);
 
     row_ptr.resize(row_ptr_size, 0);
     col_idx.resize(data_size, 0);
     values.resize(data_size, 0.0);
   }
 
-  const int row_ptr_bcast_size = (num_vertices > 0) ? (num_vertices + 1) : 1;
-  MPI_Bcast(row_ptr.data(), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  const int32_t row_ptr_bcast_size = (num_vertices > 0) ? static_cast<int32_t>(num_vertices + 1) : 1;
+  if (row_ptr_bcast_size > 0) {
+    MPI_Bcast(row_ptr.data(), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  }
 
   if (num_edges > 0) {
     MPI_Bcast(col_idx.data(), num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
@@ -247,10 +250,11 @@ bool BellmanFordCRSMPI::RunImpl() {
 
       MPI_Allreduce(MPI_IN_PLACE, distances.data(), num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
 
-      int global_updated = updated ? 1 : 0;
-      MPI_Allreduce(MPI_IN_PLACE, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+      const int global_updated = updated ? 1 : 0;
+      int global_result = 0;
+      MPI_Allreduce(&global_updated, &global_result, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-      if (global_updated == 0) {
+      if (global_result == 0) {
         break;
       }
     }
