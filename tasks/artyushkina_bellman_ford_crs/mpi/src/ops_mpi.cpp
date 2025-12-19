@@ -10,6 +10,85 @@
 
 namespace artyushkina_bellman_ford_crs {
 
+namespace {
+
+bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::vector<int32_t> &col_idx,
+                   const std::vector<double> &values, std::vector<double> &distances, int32_t num_vertices,
+                   int32_t num_edges) {
+  size_t u_idx = static_cast<size_t>(u);
+
+  if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
+    return false;
+  }
+
+  if (u_idx + 1 >= row_ptr.size()) {
+    return false;
+  }
+
+  int32_t start = row_ptr[u_idx];
+  int32_t end = row_ptr[u_idx + 1];
+
+  if (start < 0 || end < start || end > num_edges) {
+    return false;
+  }
+
+  bool updated = false;
+  for (int32_t j = start; j < end; ++j) {
+    size_t j_idx = static_cast<size_t>(j);
+    if (j_idx >= col_idx.size() || j_idx >= values.size()) {
+      continue;
+    }
+
+    int32_t v = col_idx[j_idx];
+    double weight = values[j_idx];
+
+    if (v < 0 || v >= num_vertices) {
+      continue;
+    }
+
+    size_t v_idx = static_cast<size_t>(v);
+    double new_dist = distances[u_idx] + weight;
+
+    if (new_dist < distances[v_idx]) {
+      distances[v_idx] = new_dist;
+      updated = true;
+    }
+  }
+
+  return updated;
+}
+
+std::vector<double> RunSequentialVersion(const InType &graph) {
+  if (graph.num_vertices <= 0) {
+    return std::vector<double>{};
+  }
+
+  std::vector<double> distances(static_cast<size_t>(graph.num_vertices), std::numeric_limits<double>::infinity());
+
+  if (graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices) {
+    distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
+  }
+
+  for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
+    bool updated = false;
+
+    for (int32_t u = 0; u < graph.num_vertices; ++u) {
+      if (ProcessVertex(u, graph.row_ptr, graph.col_idx, graph.values, distances, graph.num_vertices,
+                        graph.num_edges)) {
+        updated = true;
+      }
+    }
+
+    if (!updated) {
+      break;
+    }
+  }
+
+  return distances;
+}
+
+}  // namespace
+
 BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
@@ -90,81 +169,6 @@ bool BellmanFordCRSMPI::PreProcessingImpl() {
   GetOutput().clear();
   GetOutput().shrink_to_fit();
   return true;
-}
-
-bool ProcessVertex(int32_t u, const std::vector<int32_t> &row_ptr, const std::vector<int32_t> &col_idx,
-                   const std::vector<double> &values, std::vector<double> &distances, int32_t num_vertices,
-                   int32_t num_edges) {
-  size_t u_idx = static_cast<size_t>(u);
-
-  if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
-    return false;
-  }
-
-  if (u_idx + 1 >= row_ptr.size()) {
-    return false;
-  }
-
-  int32_t start = row_ptr[u_idx];
-  int32_t end = row_ptr[u_idx + 1];
-
-  if (start < 0 || end < start || end > num_edges) {
-    return false;
-  }
-
-  bool updated = false;
-  for (int32_t j = start; j < end; ++j) {
-    size_t j_idx = static_cast<size_t>(j);
-    if (j_idx >= col_idx.size() || j_idx >= values.size()) {
-      continue;
-    }
-
-    int32_t v = col_idx[j_idx];
-    double weight = values[j_idx];
-
-    if (v < 0 || v >= num_vertices) {
-      continue;
-    }
-
-    size_t v_idx = static_cast<size_t>(v);
-    double new_dist = distances[u_idx] + weight;
-
-    if (new_dist < distances[v_idx]) {
-      distances[v_idx] = new_dist;
-      updated = true;
-    }
-  }
-
-  return updated;
-}
-
-std::vector<double> RunSequentialVersion(const CRSGraph &graph) {
-  if (graph.num_vertices <= 0) {
-    return std::vector<double>{};
-  }
-
-  std::vector<double> distances(static_cast<size_t>(graph.num_vertices), std::numeric_limits<double>::infinity());
-
-  if (graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices) {
-    distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
-  }
-
-  for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
-    bool updated = false;
-
-    for (int32_t u = 0; u < graph.num_vertices; ++u) {
-      if (ProcessVertex(u, graph.row_ptr, graph.col_idx, graph.values, distances, graph.num_vertices,
-                        graph.num_edges)) {
-        updated = true;
-      }
-    }
-
-    if (!updated) {
-      break;
-    }
-  }
-
-  return distances;
 }
 
 bool BellmanFordCRSMPI::RunImpl() {
