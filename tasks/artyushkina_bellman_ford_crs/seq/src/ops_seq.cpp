@@ -1,6 +1,7 @@
 #include "artyushkina_bellman_ford_crs/seq/include/ops_seq.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <vector>
 
@@ -10,6 +11,101 @@ BellmanFordCRSSEQ::BellmanFordCRSSEQ(const InType &in) {
   SetTypeOfTask(GetStaticTypeOfTask());
   GetInput() = in;
   GetOutput() = OutType{};
+}
+
+static bool ValidateCRSGraph(const CRSGraph &graph);
+
+bool BellmanFordCRSSEQ::ValidationImpl() {
+  return ValidateCRSGraph(GetInput());
+}
+
+bool BellmanFordCRSSEQ::PreProcessingImpl() {
+  GetOutput().clear();
+  GetOutput().shrink_to_fit();
+  return true;
+}
+
+static bool ProcessVertexSeq(int32_t vertex, const CRSGraph &graph, std::vector<double> &distances) {
+  const auto vertex_idx = static_cast<size_t>(vertex);
+
+  if (distances[vertex_idx] == std::numeric_limits<double>::infinity()) {
+    return false;
+  }
+
+  if (vertex_idx + 1 >= graph.row_ptr.size()) {
+    return false;
+  }
+
+  const int32_t start = graph.row_ptr[vertex_idx];
+  const int32_t end = graph.row_ptr[vertex_idx + 1];
+
+  if (start < 0 || end < start || end > graph.num_edges) {
+    return false;
+  }
+
+  bool updated = false;
+  for (int32_t j = start; j < end; ++j) {
+    const auto j_idx = static_cast<size_t>(j);
+    if (j_idx >= graph.col_idx.size() || j_idx >= graph.values.size()) {
+      continue;
+    }
+
+    const int32_t v = graph.col_idx[j_idx];
+    const double weight = graph.values[j_idx];
+
+    if (v < 0 || v >= graph.num_vertices) {
+      continue;
+    }
+
+    const auto v_idx = static_cast<size_t>(v);
+    const double new_dist = distances[vertex_idx] + weight;
+
+    if (new_dist < distances[v_idx]) {
+      distances[v_idx] = new_dist;
+      updated = true;
+    }
+  }
+
+  return updated;
+}
+
+bool BellmanFordCRSSEQ::RunImpl() {
+  const auto &graph = GetInput();
+
+  if (graph.num_vertices <= 0) {
+    GetOutput() = std::vector<double>{};
+    return true;
+  }
+
+  std::vector<double> distances(static_cast<size_t>(graph.num_vertices), std::numeric_limits<double>::infinity());
+
+  if (graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices) {
+    distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
+  }
+
+  for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
+    bool updated = false;
+
+    for (int32_t vertex = 0; vertex < graph.num_vertices; ++vertex) {
+      if (ProcessVertexSeq(vertex, graph, distances)) {
+        updated = true;
+      }
+    }
+
+    if (!updated) {
+      break;
+    }
+  }
+
+  GetOutput() = distances;
+  return true;
+}
+
+bool BellmanFordCRSSEQ::PostProcessingImpl() {
+  if (GetOutput().capacity() > GetOutput().size() * 2) {
+    GetOutput().shrink_to_fit();
+  }
+  return true;
 }
 
 static bool ValidateCRSGraph(const CRSGraph &graph) {
@@ -56,89 +152,6 @@ static bool ValidateCRSGraph(const CRSGraph &graph) {
     }
   }
 
-  return true;
-}
-
-bool BellmanFordCRSSEQ::ValidationImpl() {
-  return ValidateCRSGraph(GetInput());
-}
-
-bool BellmanFordCRSSEQ::PreProcessingImpl() {
-  GetOutput().clear();
-  GetOutput().shrink_to_fit();
-  return true;
-}
-
-bool BellmanFordCRSSEQ::RunImpl() {
-  const auto &graph = GetInput();
-
-  if (graph.num_vertices <= 0) {
-    GetOutput() = std::vector<double>{};
-    return true;
-  }
-
-  std::vector<double> distances(static_cast<size_t>(graph.num_vertices), std::numeric_limits<double>::infinity());
-
-  if (graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices) {
-    distances[static_cast<size_t>(graph.source_vertex)] = 0.0;
-  }
-
-  for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
-    bool updated = false;
-
-    for (int32_t vertex = 0; vertex < graph.num_vertices; ++vertex) {
-      const auto vertex_idx = static_cast<size_t>(vertex);
-      if (distances[vertex_idx] == std::numeric_limits<double>::infinity()) {
-        continue;
-      }
-
-      if (vertex_idx + 1 >= graph.row_ptr.size()) {
-        continue;
-      }
-
-      const int32_t start = graph.row_ptr[vertex_idx];
-      const int32_t end = graph.row_ptr[vertex_idx + 1];
-
-      if (start < 0 || end < start || end > graph.num_edges) {
-        continue;
-      }
-
-      for (int32_t j = start; j < end; ++j) {
-        const auto j_idx = static_cast<size_t>(j);
-        if (j_idx >= graph.col_idx.size() || j_idx >= graph.values.size()) {
-          continue;
-        }
-
-        const int32_t v = graph.col_idx[j_idx];
-        const double weight = graph.values[j_idx];
-
-        if (v < 0 || v >= graph.num_vertices) {
-          continue;
-        }
-
-        const auto v_idx = static_cast<size_t>(v);
-        const double new_dist = distances[vertex_idx] + weight;
-
-        if (new_dist < distances[v_idx]) {
-          distances[v_idx] = new_dist;
-          updated = true;
-        }
-      }
-    }
-
-    if (!updated) {
-      break;
-    }
-  }
-
-  GetOutput() = distances;
-  return true;
-}
-
-bool BellmanFordCRSSEQ::PostProcessingImpl() {
-  if (GetOutput().capacity() > GetOutput().size() * 2) {
-    GetOutput().shrink_to_fit();
-  }
   return true;
 }
 
