@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <vector>
 
 #include "artyushkina_bellman_ford_crs/common/include/common.hpp"
@@ -8,6 +9,8 @@
 #include "artyushkina_bellman_ford_crs/seq/include/ops_seq.hpp"
 
 namespace artyushkina_bellman_ford_crs {
+
+namespace {
 
 bool AreDistancesEqual(const std::vector<double> &actual, const std::vector<double> &expected) {
   if (actual.size() != expected.size()) {
@@ -33,6 +36,8 @@ bool AreDistancesEqual(const std::vector<double> &actual, const std::vector<doub
 
   return true;
 }
+
+}  // namespace
 
 TEST(BellmanFordMPITest, SimpleGraphBasic) {
   CRSGraph graph;
