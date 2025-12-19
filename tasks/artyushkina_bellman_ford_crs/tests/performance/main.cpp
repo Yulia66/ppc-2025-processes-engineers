@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <iostream>
 #include <vector>
 
 #include "artyushkina_bellman_ford_crs/common/include/common.hpp"
@@ -24,11 +25,13 @@ TEST(BellmanFordPerformance, SequentialSmallGraph) {
   for (int i = 0; i < num_vertices; ++i) {
     graph.row_ptr[static_cast<size_t>(i)] = static_cast<int32_t>(edge_count);
 
-    for (int j = 0; j < edges_per_vertex && j < num_vertices; ++j) {
-      int target = (i + j + 1) % num_vertices;
-      graph.col_idx.push_back(static_cast<int32_t>(target));
-      graph.values.push_back(static_cast<double>((i + target) % 10 + 1));
-      ++edge_count;
+    for (int j = 0; j < edges_per_vertex; ++j) {
+      if (j < num_vertices) {
+        int target = (i + j + 1) % num_vertices;
+        graph.col_idx.push_back(static_cast<int32_t>(target));
+        graph.values.push_back(static_cast<double>(((i + target) % 10) + 1));
+        ++edge_count;
+      }
     }
   }
 
@@ -48,7 +51,7 @@ TEST(BellmanFordPerformance, SequentialSmallGraph) {
   auto result = algorithm.GetOutput();
   EXPECT_EQ(result.size(), static_cast<size_t>(graph.num_vertices));
 
-  std::cout << "SEQ Time for " << num_vertices << " vertices: " << duration.count() << " microseconds" << std::endl;
+  std::cout << "SEQ Time for " << num_vertices << " vertices: " << duration.count() << " microseconds\n";
 }
 
 #ifndef RUNNING_UNDER_VALGRIND
@@ -66,11 +69,13 @@ TEST(BellmanFordPerformance, MPISmallGraph) {
   for (int i = 0; i < num_vertices; ++i) {
     graph.row_ptr[static_cast<size_t>(i)] = static_cast<int32_t>(edge_count);
 
-    for (int j = 0; j < edges_per_vertex && j < num_vertices; ++j) {
-      int target = (i + j + 1) % num_vertices;
-      graph.col_idx.push_back(static_cast<int32_t>(target));
-      graph.values.push_back(static_cast<double>((i + target) % 10 + 1));
-      ++edge_count;
+    for (int j = 0; j < edges_per_vertex; ++j) {
+      if (j < num_vertices) {
+        int target = (i + j + 1) % num_vertices;
+        graph.col_idx.push_back(static_cast<int32_t>(target));
+        graph.values.push_back(static_cast<double>(((i + target) % 10) + 1));
+        ++edge_count;
+      }
     }
   }
 
@@ -90,7 +95,7 @@ TEST(BellmanFordPerformance, MPISmallGraph) {
   auto result = algorithm.GetOutput();
   EXPECT_EQ(result.size(), static_cast<size_t>(graph.num_vertices));
 
-  std::cout << "MPI Time for " << num_vertices << " vertices: " << duration.count() << " microseconds" << std::endl;
+  std::cout << "MPI Time for " << num_vertices << " vertices: " << duration.count() << " microseconds\n";
 }
 #endif
 
