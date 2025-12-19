@@ -189,7 +189,7 @@ TEST(BellmanFordMPITest, SingleVertexBasic) {
   algorithm.Run();
 
   auto result = algorithm.GetOutput();
-  EXPECT_EQ(result.size(), 1u);
+  EXPECT_EQ(result.size(), 1U);
 #endif
 }
 

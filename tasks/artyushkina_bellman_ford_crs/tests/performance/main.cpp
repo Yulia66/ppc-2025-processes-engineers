@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
@@ -19,7 +20,9 @@ TEST(BellmanFordPerformance, SequentialSmallGraph) {
   graph.num_vertices = num_vertices;
   graph.source_vertex = 0;
 
-  graph.row_ptr.resize(static_cast<size_t>(num_vertices + 1), 0);
+  // Исправлено: сначала преобразование в size_t, затем сложение
+  const size_t row_ptr_size = static_cast<size_t>(num_vertices) + 1;
+  graph.row_ptr.resize(row_ptr_size, 0);
   size_t edge_count = 0;
 
   for (int i = 0; i < num_vertices; ++i) {
@@ -63,7 +66,8 @@ TEST(BellmanFordPerformance, MPISmallGraph) {
   graph.num_vertices = num_vertices;
   graph.source_vertex = 0;
 
-  graph.row_ptr.resize(static_cast<size_t>(num_vertices + 1), 0);
+  const size_t row_ptr_size = static_cast<size_t>(num_vertices) + 1;
+  graph.row_ptr.resize(row_ptr_size, 0);
   size_t edge_count = 0;
 
   for (int i = 0; i < num_vertices; ++i) {
