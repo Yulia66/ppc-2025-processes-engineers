@@ -1,6 +1,5 @@
 #include "artyushkina_bellman_ford_crs/seq/include/ops_seq.hpp"
 
-#include <algorithm>
 #include <cstddef>
 #include <limits>
 #include <vector>
@@ -13,42 +12,27 @@ BellmanFordCRSSEQ::BellmanFordCRSSEQ(const InType &in) {
   GetOutput() = OutType{};
 }
 
-bool BellmanFordCRSSEQ::ValidationImpl() {
-  const auto &graph = GetInput();
-
+static bool ValidateCRSGraph(const CRSGraph &graph) {
   if (graph.num_vertices < 0) {
     return false;
   }
 
   if (graph.num_vertices == 0) {
-    if (graph.source_vertex != 0) {
-      return false;
-    }
-    if (graph.row_ptr.size() != 1 || graph.row_ptr[0] != 0) {
-      return false;
-    }
-    if (graph.num_edges != 0) {
-      return false;
-    }
-    if (!graph.col_idx.empty() || !graph.values.empty()) {
-      return false;
-    }
-    return true;
+    return graph.source_vertex == 0 && graph.row_ptr.size() == 1 && graph.row_ptr[0] == 0 && graph.num_edges == 0 &&
+           graph.col_idx.empty() && graph.values.empty();
   }
 
   if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
     return false;
   }
 
-  if (graph.row_ptr.size() != static_cast<size_t>(graph.num_vertices + 1)) {
+  const size_t expected_row_ptr_size = static_cast<size_t>(graph.num_vertices) + 1;
+  if (graph.row_ptr.size() != expected_row_ptr_size) {
     return false;
   }
 
-  if (graph.col_idx.size() != static_cast<size_t>(graph.num_edges)) {
-    return false;
-  }
-
-  if (graph.values.size() != static_cast<size_t>(graph.num_edges)) {
+  if (graph.col_idx.size() != static_cast<size_t>(graph.num_edges) ||
+      graph.values.size() != static_cast<size_t>(graph.num_edges)) {
     return false;
   }
 
@@ -75,6 +59,10 @@ bool BellmanFordCRSSEQ::ValidationImpl() {
   return true;
 }
 
+bool BellmanFordCRSSEQ::ValidationImpl() {
+  return ValidateCRSGraph(GetInput());
+}
+
 bool BellmanFordCRSSEQ::PreProcessingImpl() {
   GetOutput().clear();
   GetOutput().shrink_to_fit();
@@ -98,38 +86,38 @@ bool BellmanFordCRSSEQ::RunImpl() {
   for (int32_t i = 0; i < graph.num_vertices - 1; ++i) {
     bool updated = false;
 
-    for (int32_t u = 0; u < graph.num_vertices; ++u) {
-      size_t u_idx = static_cast<size_t>(u);
-      if (distances[u_idx] == std::numeric_limits<double>::infinity()) {
+    for (int32_t vertex = 0; vertex < graph.num_vertices; ++vertex) {
+      const auto vertex_idx = static_cast<size_t>(vertex);
+      if (distances[vertex_idx] == std::numeric_limits<double>::infinity()) {
         continue;
       }
 
-      if (u_idx + 1 >= graph.row_ptr.size()) {
+      if (vertex_idx + 1 >= graph.row_ptr.size()) {
         continue;
       }
 
-      int32_t start = graph.row_ptr[u_idx];
-      int32_t end = graph.row_ptr[u_idx + 1];
+      const int32_t start = graph.row_ptr[vertex_idx];
+      const int32_t end = graph.row_ptr[vertex_idx + 1];
 
       if (start < 0 || end < start || end > graph.num_edges) {
         continue;
       }
 
       for (int32_t j = start; j < end; ++j) {
-        size_t j_idx = static_cast<size_t>(j);
+        const auto j_idx = static_cast<size_t>(j);
         if (j_idx >= graph.col_idx.size() || j_idx >= graph.values.size()) {
           continue;
         }
 
-        int32_t v = graph.col_idx[j_idx];
-        double weight = graph.values[j_idx];
+        const int32_t v = graph.col_idx[j_idx];
+        const double weight = graph.values[j_idx];
 
         if (v < 0 || v >= graph.num_vertices) {
           continue;
         }
 
-        size_t v_idx = static_cast<size_t>(v);
-        double new_dist = distances[u_idx] + weight;
+        const auto v_idx = static_cast<size_t>(v);
+        const double new_dist = distances[vertex_idx] + weight;
 
         if (new_dist < distances[v_idx]) {
           distances[v_idx] = new_dist;
