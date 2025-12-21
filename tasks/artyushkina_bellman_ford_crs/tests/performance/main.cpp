@@ -20,7 +20,6 @@ TEST(BellmanFordPerformance, SequentialSmallGraph) {
   graph.num_vertices = num_vertices;
   graph.source_vertex = 0;
 
-  // Исправлено: сначала преобразование в size_t, затем сложение
   const size_t row_ptr_size = static_cast<size_t>(num_vertices) + 1;
   graph.row_ptr.resize(row_ptr_size, 0);
   size_t edge_count = 0;
@@ -44,6 +43,7 @@ TEST(BellmanFordPerformance, SequentialSmallGraph) {
   BellmanFordCRSSEQ algorithm(graph);
 
   EXPECT_TRUE(algorithm.Validation());
+  EXPECT_TRUE(algorithm.PreProcessing());
 
   auto start = std::chrono::high_resolution_clock::now();
   algorithm.Run();
@@ -89,6 +89,7 @@ TEST(BellmanFordPerformance, MPISmallGraph) {
   BellmanFordCRSMPI algorithm(graph);
 
   EXPECT_TRUE(algorithm.Validation());
+  EXPECT_TRUE(algorithm.PreProcessing());
 
   auto start = std::chrono::high_resolution_clock::now();
   algorithm.Run();
