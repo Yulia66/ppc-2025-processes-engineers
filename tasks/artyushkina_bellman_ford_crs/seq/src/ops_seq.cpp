@@ -13,19 +13,72 @@ BellmanFordCRSSEQ::BellmanFordCRSSEQ(const InType &in) {
   GetOutput() = OutType{};
 }
 
-static bool ValidateCRSGraph(const CRSGraph &graph);
+namespace {
 
-bool BellmanFordCRSSEQ::ValidationImpl() {
-  return ValidateCRSGraph(GetInput());
+bool ValidateEmptyGraph(const CRSGraph &graph) {
+  return graph.source_vertex == 0 && graph.row_ptr.size() == 1 && graph.row_ptr[0] == 0 && graph.num_edges == 0 &&
+         graph.col_idx.empty() && graph.values.empty();
 }
 
-bool BellmanFordCRSSEQ::PreProcessingImpl() {
-  GetOutput().clear();
-  GetOutput().shrink_to_fit();
+bool ValidateRowPtr(const CRSGraph &graph) {
+  if (graph.row_ptr[0] != 0) {
+    return false;
+  }
+
+  if (graph.row_ptr[static_cast<size_t>(graph.num_vertices)] != graph.num_edges) {
+    return false;
+  }
+
+  for (size_t i = 1; i < graph.row_ptr.size(); ++i) {
+    if (graph.row_ptr[i] < graph.row_ptr[i - 1]) {
+      return false;
+    }
+  }
+
   return true;
 }
 
-static bool ProcessVertexSeq(int32_t vertex, const CRSGraph &graph, std::vector<double> &distances) {
+bool ValidateIndicesAndValues(const CRSGraph &graph) {
+  if (graph.col_idx.size() != static_cast<size_t>(graph.num_edges) ||
+      graph.values.size() != static_cast<size_t>(graph.num_edges)) {
+    return false;
+  }
+
+  for (size_t i = 0; i < graph.col_idx.size(); ++i) {
+    if (graph.col_idx[i] < 0 || graph.col_idx[i] >= graph.num_vertices) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool ValidateCRSGraph(const CRSGraph &graph) {
+  if (graph.num_vertices < 0) {
+    return false;
+  }
+
+  if (graph.num_vertices == 0) {
+    return ValidateEmptyGraph(graph);
+  }
+
+  if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
+    return false;
+  }
+
+  const size_t expected_row_ptr_size = static_cast<size_t>(graph.num_vertices) + 1;
+  if (graph.row_ptr.size() != expected_row_ptr_size) {
+    return false;
+  }
+
+  if (!ValidateRowPtr(graph)) {
+    return false;
+  }
+
+  return ValidateIndicesAndValues(graph);
+}
+
+bool ProcessVertexSeq(int32_t vertex, const CRSGraph &graph, std::vector<double> &distances) {
   const auto vertex_idx = static_cast<size_t>(vertex);
 
   if (distances[vertex_idx] == std::numeric_limits<double>::infinity()) {
@@ -69,6 +122,18 @@ static bool ProcessVertexSeq(int32_t vertex, const CRSGraph &graph, std::vector<
   return updated;
 }
 
+}  // namespace
+
+bool BellmanFordCRSSEQ::ValidationImpl() {
+  return ValidateCRSGraph(GetInput());
+}
+
+bool BellmanFordCRSSEQ::PreProcessingImpl() {
+  GetOutput().clear();
+  GetOutput().shrink_to_fit();
+  return true;
+}
+
 bool BellmanFordCRSSEQ::RunImpl() {
   const auto &graph = GetInput();
 
@@ -105,53 +170,6 @@ bool BellmanFordCRSSEQ::PostProcessingImpl() {
   if (GetOutput().capacity() > GetOutput().size() * 2) {
     GetOutput().shrink_to_fit();
   }
-  return true;
-}
-
-static bool ValidateCRSGraph(const CRSGraph &graph) {
-  if (graph.num_vertices < 0) {
-    return false;
-  }
-
-  if (graph.num_vertices == 0) {
-    return graph.source_vertex == 0 && graph.row_ptr.size() == 1 && graph.row_ptr[0] == 0 && graph.num_edges == 0 &&
-           graph.col_idx.empty() && graph.values.empty();
-  }
-
-  if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
-    return false;
-  }
-
-  const size_t expected_row_ptr_size = static_cast<size_t>(graph.num_vertices) + 1;
-  if (graph.row_ptr.size() != expected_row_ptr_size) {
-    return false;
-  }
-
-  if (graph.col_idx.size() != static_cast<size_t>(graph.num_edges) ||
-      graph.values.size() != static_cast<size_t>(graph.num_edges)) {
-    return false;
-  }
-
-  if (graph.row_ptr[0] != 0) {
-    return false;
-  }
-
-  if (graph.row_ptr[static_cast<size_t>(graph.num_vertices)] != graph.num_edges) {
-    return false;
-  }
-
-  for (size_t i = 1; i < graph.row_ptr.size(); ++i) {
-    if (graph.row_ptr[i] < graph.row_ptr[i - 1]) {
-      return false;
-    }
-  }
-
-  for (size_t i = 0; i < graph.col_idx.size(); ++i) {
-    if (graph.col_idx[i] < 0 || graph.col_idx[i] >= graph.num_vertices) {
-      return false;
-    }
-  }
-
   return true;
 }
 
