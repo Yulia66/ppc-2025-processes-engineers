@@ -57,7 +57,7 @@ bool ProcessVertex(int32_t vertex, const std::vector<int32_t> &row_ptr, const st
   return updated;
 }
 
-std::vector<double> RunSequentialVersion(const InType &graph) {
+std::vector<double> RunSequentialVersion(const CRSGraph &graph) {
   if (graph.num_vertices <= 0) {
     return std::vector<double>{};
   }
@@ -92,7 +92,7 @@ bool ValidateEmptyGraph(const CRSGraph &graph) {
 }
 
 bool ValidateSourceVertex(const CRSGraph &graph) {
-  return !(graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices);
+  return graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices;
 }
 
 bool ValidateRowPtrSize(const CRSGraph &graph) {

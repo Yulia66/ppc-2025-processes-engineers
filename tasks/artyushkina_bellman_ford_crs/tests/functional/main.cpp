@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
-#include <string>
 #include <vector>
 
 #include "artyushkina_bellman_ford_crs/common/include/common.hpp"

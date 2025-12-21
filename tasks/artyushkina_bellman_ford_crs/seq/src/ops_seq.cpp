@@ -21,7 +21,7 @@ bool ValidateEmptyGraph(const CRSGraph &graph) {
 }
 
 bool ValidateSourceVertex(const CRSGraph &graph) {
-  return !(graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices);
+  return graph.source_vertex >= 0 && graph.source_vertex < graph.num_vertices;
 }
 
 bool ValidateRowPtrSize(const CRSGraph &graph) {
