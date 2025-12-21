@@ -5,6 +5,8 @@
 #include <limits>
 #include <vector>
 
+#include "artyushkina_bellman_ford_crs/common/include/common.hpp"
+
 namespace artyushkina_bellman_ford_crs {
 
 BellmanFordCRSSEQ::BellmanFordCRSSEQ(const InType &in) {
