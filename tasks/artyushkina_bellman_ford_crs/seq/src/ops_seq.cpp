@@ -20,36 +20,39 @@ bool ValidateEmptyGraph(const CRSGraph &graph) {
          graph.col_idx.empty() && graph.values.empty();
 }
 
-bool ValidateRowPtr(const CRSGraph &graph) {
-  if (graph.row_ptr[0] != 0) {
-    return false;
-  }
+bool ValidateSourceVertex(const CRSGraph &graph) {
+  return !(graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices);
+}
 
-  if (graph.row_ptr[static_cast<size_t>(graph.num_vertices)] != graph.num_edges) {
-    return false;
-  }
+bool ValidateRowPtrSize(const CRSGraph &graph) {
+  const size_t expected_row_ptr_size = static_cast<size_t>(graph.num_vertices) + 1;
+  return graph.row_ptr.size() == expected_row_ptr_size;
+}
 
+bool ValidateArraysSize(const CRSGraph &graph) {
+  return graph.col_idx.size() == static_cast<size_t>(graph.num_edges) &&
+         graph.values.size() == static_cast<size_t>(graph.num_edges);
+}
+
+bool ValidateRowPtrBasic(const CRSGraph &graph) {
+  return graph.row_ptr[0] == 0 && graph.row_ptr[static_cast<size_t>(graph.num_vertices)] == graph.num_edges;
+}
+
+bool ValidateRowPtrMonotonic(const CRSGraph &graph) {
   for (size_t i = 1; i < graph.row_ptr.size(); ++i) {
     if (graph.row_ptr[i] < graph.row_ptr[i - 1]) {
       return false;
     }
   }
-
   return true;
 }
 
-bool ValidateIndicesAndValues(const CRSGraph &graph) {
-  if (graph.col_idx.size() != static_cast<size_t>(graph.num_edges) ||
-      graph.values.size() != static_cast<size_t>(graph.num_edges)) {
-    return false;
-  }
-
+bool ValidateIndices(const CRSGraph &graph) {
   for (size_t i = 0; i < graph.col_idx.size(); ++i) {
     if (graph.col_idx[i] < 0 || graph.col_idx[i] >= graph.num_vertices) {
       return false;
     }
   }
-
   return true;
 }
 
@@ -62,20 +65,27 @@ bool ValidateCRSGraph(const CRSGraph &graph) {
     return ValidateEmptyGraph(graph);
   }
 
-  if (graph.source_vertex < 0 || graph.source_vertex >= graph.num_vertices) {
+  if (!ValidateSourceVertex(graph)) {
     return false;
   }
 
-  const size_t expected_row_ptr_size = static_cast<size_t>(graph.num_vertices) + 1;
-  if (graph.row_ptr.size() != expected_row_ptr_size) {
+  if (!ValidateRowPtrSize(graph)) {
     return false;
   }
 
-  if (!ValidateRowPtr(graph)) {
+  if (!ValidateArraysSize(graph)) {
     return false;
   }
 
-  return ValidateIndicesAndValues(graph);
+  if (!ValidateRowPtrBasic(graph)) {
+    return false;
+  }
+
+  if (!ValidateRowPtrMonotonic(graph)) {
+    return false;
+  }
+
+  return ValidateIndices(graph);
 }
 
 bool ProcessVertexSeq(int32_t vertex, const CRSGraph &graph, std::vector<double> &distances) {

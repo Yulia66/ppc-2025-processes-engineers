@@ -2,8 +2,8 @@
 
 #include <cmath>
 #include <cstddef>
-#include <iostream>
 #include <limits>
+#include <string>
 #include <vector>
 
 #include "artyushkina_bellman_ford_crs/common/include/common.hpp"
@@ -16,7 +16,6 @@ namespace {
 
 bool AreDistancesEqual(const std::vector<double> &actual, const std::vector<double> &expected) {
   if (actual.size() != expected.size()) {
-    std::cout << "Size mismatch: actual=" << actual.size() << ", expected=" << expected.size() << std::endl;
     return false;
   }
 
@@ -29,15 +28,10 @@ bool AreDistancesEqual(const std::vector<double> &actual, const std::vector<doub
     }
 
     if (actual_is_inf != expected_is_inf) {
-      std::cout << "Infinity mismatch at index " << i
-                << ": actual=" << (actual_is_inf ? "inf" : std::to_string(actual[i]))
-                << ", expected=" << (expected_is_inf ? "inf" : std::to_string(expected[i])) << std::endl;
       return false;
     }
 
     if (std::fabs(actual[i] - expected[i]) > 1e-9) {
-      std::cout << "Value mismatch at index " << i << ": actual=" << actual[i] << ", expected=" << expected[i]
-                << ", diff=" << std::fabs(actual[i] - expected[i]) << std::endl;
       return false;
     }
   }

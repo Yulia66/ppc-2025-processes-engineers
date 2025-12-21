@@ -202,12 +202,12 @@ void ResizeBuffers(int rank, GraphData &data) {
 
 void BroadcastBuffers(GraphData &data) {
   if (data.num_vertices > 0) {
-    const int32_t row_ptr_bcast_size = static_cast<int32_t>(data.num_vertices + 1);
-    MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    const auto row_ptr_bcast_size = static_cast<int>(data.num_vertices + 1);
+    MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT, 0, MPI_COMM_WORLD);
   }
 
   if (data.num_edges > 0) {
-    MPI_Bcast(data.col_idx.data(), data.num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(data.col_idx.data(), data.num_edges, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(data.values.data(), data.num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 }
