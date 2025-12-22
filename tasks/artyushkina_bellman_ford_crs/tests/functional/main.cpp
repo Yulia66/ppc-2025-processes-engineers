@@ -56,7 +56,7 @@ TEST(BellmanFordMPITest, SimpleGraphBasic) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
@@ -79,7 +79,7 @@ TEST(BellmanFordMPITest, SingleVertex) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
@@ -102,7 +102,7 @@ TEST(BellmanFordMPITest, DisconnectedGraph) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
@@ -125,7 +125,7 @@ TEST(BellmanFordMPITest, NegativeWeights) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
@@ -148,7 +148,7 @@ TEST(BellmanFordMPITest, EmptyGraph) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
@@ -171,7 +171,7 @@ TEST(BellmanFordSEQTest, SimpleGraphBasic) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
@@ -194,11 +194,98 @@ TEST(BellmanFordSEQTest, SingleVertex) {
 
   EXPECT_TRUE(algorithm.Validation());
   EXPECT_TRUE(algorithm.PreProcessing());
-  algorithm.Run();
+  EXPECT_TRUE(algorithm.Run());
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
   EXPECT_TRUE(AreDistancesEqual(result, expected));
+}
+
+TEST(BellmanFordCoverageTest, InvalidGraphs) {
+  {
+    CRSGraph invalid_graph;
+    invalid_graph.num_vertices = -1;
+    invalid_graph.num_edges = 0;
+    invalid_graph.source_vertex = 0;
+    invalid_graph.row_ptr = {0};
+    invalid_graph.col_idx = {};
+    invalid_graph.values = {};
+
+    BellmanFordCRSSEQ seq_invalid(invalid_graph);
+    EXPECT_FALSE(seq_invalid.Validation());
+
+    BellmanFordCRSMPI mpi_invalid(invalid_graph);
+    EXPECT_FALSE(mpi_invalid.Validation());
+  }
+
+  {
+    CRSGraph graph;
+    graph.num_vertices = 3;
+    graph.num_edges = 2;
+    graph.source_vertex = 5;
+    graph.row_ptr = {0, 1, 2, 2};
+    graph.col_idx = {1, 2};
+    graph.values = {1.0, 2.0};
+
+    BellmanFordCRSSEQ seq_algo(graph);
+    EXPECT_FALSE(seq_algo.Validation());
+
+    BellmanFordCRSMPI mpi_algo(graph);
+    EXPECT_FALSE(mpi_algo.Validation());
+  }
+
+  {
+    CRSGraph graph;
+    graph.num_vertices = 2;
+    graph.num_edges = 1;
+    graph.source_vertex = 0;
+    graph.row_ptr = {0, 2, 1};
+    graph.col_idx = {1};
+    graph.values = {1.0};
+
+    BellmanFordCRSSEQ seq_algo(graph);
+    EXPECT_FALSE(seq_algo.Validation());
+  }
+
+  {
+    CRSGraph graph;
+    graph.num_vertices = 2;
+    graph.num_edges = 0;
+    graph.source_vertex = 0;
+    graph.row_ptr = {0, 0, 0};
+    graph.col_idx = {};
+    graph.values = {};
+
+    BellmanFordCRSSEQ seq_algo(graph);
+    EXPECT_TRUE(seq_algo.Validation());
+    EXPECT_TRUE(seq_algo.PreProcessing());
+    EXPECT_TRUE(seq_algo.Run());
+    EXPECT_TRUE(seq_algo.PostProcessing());
+
+    auto result = seq_algo.GetOutput();
+    EXPECT_EQ(result.size(), 2u);
+    EXPECT_DOUBLE_EQ(result[0], 0.0);
+    EXPECT_TRUE(std::isinf(result[1]));
+  }
+
+  {
+    CRSGraph graph;
+    graph.num_vertices = 3;
+    graph.num_edges = 3;
+    graph.source_vertex = 0;
+    graph.row_ptr = {0, 1, 2, 3};
+    graph.col_idx = {1, 2, 0};
+    graph.values = {1.0, 2.0, -4.0};
+
+    BellmanFordCRSSEQ seq_algo(graph);
+    EXPECT_TRUE(seq_algo.Validation());
+    EXPECT_TRUE(seq_algo.PreProcessing());
+    EXPECT_TRUE(seq_algo.Run());
+    EXPECT_TRUE(seq_algo.PostProcessing());
+
+    auto result = seq_algo.GetOutput();
+    EXPECT_EQ(result.size(), 3u);
+  }
 }
 
 }  // namespace artyushkina_bellman_ford_crs
