@@ -103,10 +103,8 @@ bool ValidateRowPtrSize(const CRSGraph &graph) {
 }
 
 bool ValidateArraysSize(const CRSGraph &graph) {
-  return graph.col_idx.size() != static_cast<size_t>(graph.num_edges) ||
-                 graph.values.size() != static_cast<size_t>(graph.num_edges)
-             ? false
-             : true;
+  return graph.col_idx.size() == static_cast<size_t>(graph.num_edges) &&
+         graph.values.size() == static_cast<size_t>(graph.num_edges);
 }
 
 bool ValidateRowPtrBasic(const CRSGraph &graph) {
@@ -206,12 +204,12 @@ void ResizeBuffers(int rank, GraphData &data) {
 
 void BroadcastBuffers(GraphData &data) {
   if (data.num_vertices > 0) {
-    const int32_t row_ptr_bcast_size = static_cast<int32_t>(data.num_vertices + 1);
-    MPI_Bcast(reinterpret_cast<int32_t *>(data.row_ptr.data()), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    const auto row_ptr_bcast_size = static_cast<int32_t>(data.num_vertices + 1);
+    MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
   }
 
   if (data.num_edges > 0) {
-    MPI_Bcast(reinterpret_cast<int32_t *>(data.col_idx.data()), data.num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(data.col_idx.data(), data.num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
     MPI_Bcast(data.values.data(), data.num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 }
