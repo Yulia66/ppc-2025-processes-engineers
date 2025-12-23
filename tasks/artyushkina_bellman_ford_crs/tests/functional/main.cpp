@@ -262,8 +262,7 @@ TEST(BellmanFordValidationTest, TwoVerticesNoEdges) {
   EXPECT_TRUE(seq_algo.PostProcessing());
 
   auto result = seq_algo.GetOutput();
-  EXPECT_EQ(result.size(), 2u);
-
+  EXPECT_EQ(result.size(), 2U);
   EXPECT_DOUBLE_EQ(result[0], 0.0);
   EXPECT_TRUE(std::isinf(result[1]));
 }
@@ -284,7 +283,7 @@ TEST(BellmanFordValidationTest, GraphWithNegativeCycle) {
   EXPECT_TRUE(seq_algo.PostProcessing());
 
   auto result = seq_algo.GetOutput();
-  EXPECT_EQ(result.size(), 3u);
+  EXPECT_EQ(result.size(), 3U);
 }
 
 }  // namespace artyushkina_bellman_ford_crs
