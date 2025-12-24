@@ -124,8 +124,8 @@ bool ValidateRowPtrMonotonic(const CRSGraph &graph) {
 }
 
 bool ValidateIndices(const CRSGraph &graph) {
-  for (size_t i = 0; i < graph.col_idx.size(); ++i) {
-    if (graph.col_idx[i] < 0 || graph.col_idx[i] >= graph.num_vertices) {
+  for (const auto &idx : graph.col_idx) {
+    if (idx < 0 || idx >= graph.num_vertices) {
       return false;
     }
   }
@@ -205,7 +205,7 @@ void BroadcastBasicData(GraphData &data) {
 
 void ResizeBuffers(int rank, GraphData &data) {
   if (rank != 0) {
-    const size_t row_ptr_size = (data.num_vertices > 0) ? static_cast<size_t>(data.num_vertices) + 1 : 1;
+    const auto row_ptr_size = (data.num_vertices > 0) ? static_cast<size_t>(data.num_vertices) + 1 : 1;
     const auto data_size = static_cast<size_t>(data.num_edges);
 
     data.row_ptr.resize(row_ptr_size, 0);
@@ -244,11 +244,14 @@ bool PerformBellmanFordIteration(int world_size, int rank, const GraphData &data
   bool updated = false;
 
   for (int vertex = rank; vertex < data.num_vertices; vertex += world_size) {
-    int32_t vertex_32 = static_cast<int32_t>(vertex);
-    int32_t num_vertices_32 = static_cast<int32_t>(data.num_vertices);
-    int32_t num_edges_32 = static_cast<int32_t>(data.num_edges);
+    auto vertex_32 = static_cast<int32_t>(vertex);
+    auto num_vertices_32 = static_cast<int32_t>(data.num_vertices);
+    auto num_edges_32 = static_cast<int32_t>(data.num_edges);
 
-    if (ProcessVertex(vertex_32, data.row_ptr, data.col_idx, data.values, distances, num_vertices_32, num_edges_32)) {
+    std::vector<int32_t> row_ptr_32(data.row_ptr.begin(), data.row_ptr.end());
+    std::vector<int32_t> col_idx_32(data.col_idx.begin(), data.col_idx.end());
+
+    if (ProcessVertex(vertex_32, row_ptr_32, col_idx_32, data.values, distances, num_vertices_32, num_edges_32)) {
       updated = true;
     }
   }
