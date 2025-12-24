@@ -165,11 +165,11 @@ bool ValidateCRSGraph(const CRSGraph &graph) {
 }
 
 struct GraphData {
-  int32_t num_vertices{0};
-  int32_t source_vertex{0};
-  int32_t num_edges{0};
-  std::vector<int32_t> row_ptr;
-  std::vector<int32_t> col_idx;
+  int num_vertices{0};
+  int source_vertex{0};
+  int num_edges{0};
+  std::vector<int> row_ptr;
+  std::vector<int> col_idx;
   std::vector<double> values;
 };
 
@@ -177,11 +177,20 @@ GraphData GetGraphData(int rank, const CRSGraph &input_graph) {
   GraphData data;
 
   if (rank == 0) {
-    data.num_vertices = input_graph.num_vertices;
-    data.source_vertex = input_graph.source_vertex;
-    data.num_edges = input_graph.num_edges;
-    data.row_ptr = input_graph.row_ptr;
-    data.col_idx = input_graph.col_idx;
+    data.num_vertices = static_cast<int>(input_graph.num_vertices);
+    data.source_vertex = static_cast<int>(input_graph.source_vertex);
+    data.num_edges = static_cast<int>(input_graph.num_edges);
+
+    data.row_ptr.reserve(input_graph.row_ptr.size());
+    for (const auto &val : input_graph.row_ptr) {
+      data.row_ptr.push_back(static_cast<int>(val));
+    }
+
+    data.col_idx.reserve(input_graph.col_idx.size());
+    for (const auto &val : input_graph.col_idx) {
+      data.col_idx.push_back(static_cast<int>(val));
+    }
+
     data.values = input_graph.values;
   }
 
@@ -217,7 +226,7 @@ void BroadcastBuffers(GraphData &data) {
   }
 }
 
-std::vector<double> InitializeDistances(int32_t num_vertices, int32_t source_vertex) {
+std::vector<double> InitializeDistances(int num_vertices, int source_vertex) {
   if (num_vertices <= 0) {
     return std::vector<double>{};
   }
@@ -234,8 +243,12 @@ std::vector<double> InitializeDistances(int32_t num_vertices, int32_t source_ver
 bool PerformBellmanFordIteration(int world_size, int rank, const GraphData &data, std::vector<double> &distances) {
   bool updated = false;
 
-  for (int32_t vertex = rank; vertex < data.num_vertices; vertex += world_size) {
-    if (ProcessVertex(vertex, data.row_ptr, data.col_idx, data.values, distances, data.num_vertices, data.num_edges)) {
+  for (int vertex = rank; vertex < data.num_vertices; vertex += world_size) {
+    int32_t vertex_32 = static_cast<int32_t>(vertex);
+    int32_t num_vertices_32 = static_cast<int32_t>(data.num_vertices);
+    int32_t num_edges_32 = static_cast<int32_t>(data.num_edges);
+
+    if (ProcessVertex(vertex_32, data.row_ptr, data.col_idx, data.values, distances, num_vertices_32, num_edges_32)) {
       updated = true;
     }
   }
@@ -256,7 +269,7 @@ std::vector<double> RunMPIBellmanFord(int world_size, int rank, GraphData &data)
     return distances;
   }
 
-  for (int32_t iter = 0; iter < data.num_vertices - 1; ++iter) {
+  for (int iter = 0; iter < data.num_vertices - 1; ++iter) {
     if (!PerformBellmanFordIteration(world_size, rank, data, distances)) {
       break;
     }
