@@ -37,6 +37,9 @@ bool ValidateArraysSize(const CRSGraph &graph) {
 }
 
 bool ValidateRowPtrBasic(const CRSGraph &graph) {
+  if (graph.row_ptr.empty()) {
+    return false;
+  }
   return graph.row_ptr[0] == 0 && graph.row_ptr[static_cast<size_t>(graph.num_vertices)] == graph.num_edges;
 }
 

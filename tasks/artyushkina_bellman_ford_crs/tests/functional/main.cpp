@@ -13,6 +13,8 @@ namespace artyushkina_bellman_ford_crs {
 
 namespace {
 
+constexpr double kEpsilon = 1e-9;
+
 bool AreDistancesEqual(const std::vector<double> &actual, const std::vector<double> &expected) {
   if (actual.size() != expected.size()) {
     return false;
@@ -30,7 +32,7 @@ bool AreDistancesEqual(const std::vector<double> &actual, const std::vector<doub
       return false;
     }
 
-    if (std::fabs(actual[i] - expected[i]) > 1e-9) {
+    if (std::fabs(actual[i] - expected[i]) > kEpsilon) {
       return false;
     }
   }
@@ -60,7 +62,8 @@ TEST(BellmanFordMPITest, SimpleGraphBasic) {
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
-  EXPECT_TRUE(AreDistancesEqual(result, expected));
+  EXPECT_TRUE(AreDistancesEqual(result, expected)) << "Expected: [0.0, 1.0, 3.0, 6.0], Got: [" << result[0] << ", "
+                                                   << result[1] << ", " << result[2] << ", " << result[3] << "]";
 }
 
 TEST(BellmanFordMPITest, SingleVertex) {
@@ -84,6 +87,7 @@ TEST(BellmanFordMPITest, SingleVertex) {
 
   auto result = algorithm.GetOutput();
   EXPECT_TRUE(AreDistancesEqual(result, expected));
+  EXPECT_EQ(result.size(), 1U);
 }
 
 TEST(BellmanFordMPITest, DisconnectedGraph) {
@@ -107,6 +111,7 @@ TEST(BellmanFordMPITest, DisconnectedGraph) {
 
   auto result = algorithm.GetOutput();
   EXPECT_TRUE(AreDistancesEqual(result, expected));
+  EXPECT_EQ(result.size(), 4U);
 }
 
 TEST(BellmanFordMPITest, NegativeWeights) {
@@ -152,7 +157,7 @@ TEST(BellmanFordMPITest, EmptyGraph) {
   EXPECT_TRUE(algorithm.PostProcessing());
 
   auto result = algorithm.GetOutput();
-  EXPECT_TRUE(AreDistancesEqual(result, expected));
+  EXPECT_TRUE(result.empty());
 }
 
 TEST(BellmanFordSEQTest, SimpleGraphBasic) {
@@ -199,6 +204,7 @@ TEST(BellmanFordSEQTest, SingleVertex) {
 
   auto result = algorithm.GetOutput();
   EXPECT_TRUE(AreDistancesEqual(result, expected));
+  EXPECT_EQ(result.size(), 1U);
 }
 
 TEST(BellmanFordValidationTest, NegativeVertices) {
@@ -284,6 +290,35 @@ TEST(BellmanFordValidationTest, GraphWithNegativeCycle) {
 
   auto result = seq_algo.GetOutput();
   EXPECT_EQ(result.size(), 3U);
+}
+
+TEST(BellmanFordValidationTest, LargeRowPtrArray) {
+  CRSGraph graph;
+  graph.num_vertices = 2;
+  graph.num_edges = 1;
+  graph.source_vertex = 0;
+  graph.row_ptr = {0, 1, 1, 1};
+  graph.col_idx = {1};
+  graph.values = {1.0};
+
+  BellmanFordCRSSEQ seq_algo(graph);
+  EXPECT_FALSE(seq_algo.Validation());
+}
+
+TEST(BellmanFordValidationTest, ZeroVerticesValid) {
+  CRSGraph graph;
+  graph.num_vertices = 0;
+  graph.num_edges = 0;
+  graph.source_vertex = 0;
+  graph.row_ptr = {0};
+  graph.col_idx = {};
+  graph.values = {};
+
+  BellmanFordCRSSEQ seq_algo(graph);
+  EXPECT_TRUE(seq_algo.Validation());
+
+  BellmanFordCRSMPI mpi_algo(graph);
+  EXPECT_TRUE(mpi_algo.Validation());
 }
 
 }  // namespace artyushkina_bellman_ford_crs

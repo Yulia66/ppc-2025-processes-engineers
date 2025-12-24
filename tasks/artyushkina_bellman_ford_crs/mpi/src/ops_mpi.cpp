@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -108,6 +109,9 @@ bool ValidateArraysSize(const CRSGraph &graph) {
 }
 
 bool ValidateRowPtrBasic(const CRSGraph &graph) {
+  if (graph.row_ptr.empty()) {
+    return false;
+  }
   return graph.row_ptr[0] == 0 && graph.row_ptr[static_cast<size_t>(graph.num_vertices)] == graph.num_edges;
 }
 
@@ -205,11 +209,11 @@ void ResizeBuffers(int rank, GraphData &data) {
 void BroadcastBuffers(GraphData &data) {
   if (data.num_vertices > 0) {
     const auto row_ptr_bcast_size = static_cast<int>(data.num_vertices + 1);
-    MPI_Bcast(static_cast<void *>(data.row_ptr.data()), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
   }
 
   if (data.num_edges > 0) {
-    MPI_Bcast(static_cast<void *>(data.col_idx.data()), data.num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(data.col_idx.data(), data.num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
     MPI_Bcast(data.values.data(), data.num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 }
@@ -237,13 +241,15 @@ bool PerformBellmanFordIteration(int world_size, int rank, const GraphData &data
     }
   }
 
+  // Синхронизируем расстояния между процессами
   MPI_Allreduce(MPI_IN_PLACE, distances.data(), data.num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
 
-  const int global_updated = updated ? 1 : 0;
-  int global_result = 0;
-  MPI_Allreduce(&global_updated, &global_result, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  // Синхронизируем флаг обновления
+  const int local_updated = updated ? 1 : 0;
+  int global_updated = 0;
+  MPI_Allreduce(&local_updated, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-  return global_result != 0;
+  return global_updated != 0;
 }
 
 std::vector<double> RunMPIBellmanFord(int world_size, int rank, GraphData &data) {
@@ -270,6 +276,11 @@ BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   GetOutput() = OutType{};
 }
 
+BellmanFordCRSMPI::~BellmanFordCRSMPI() {
+  // Пустой деструктор - не вызываем MPI_Finalize здесь
+  // Управление жизненным циклом MPI оставляем системе тестирования
+}
+
 bool BellmanFordCRSMPI::ValidationImpl() {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
@@ -278,7 +289,7 @@ bool BellmanFordCRSMPI::ValidationImpl() {
   if (mpi_initialized != 0) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank != 0) {
-      return true;
+      return true;  // Валидация выполняется только на процессе 0
     }
   }
 
@@ -295,6 +306,7 @@ bool BellmanFordCRSMPI::RunImpl() {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
+  // Если MPI не инициализирован, запускаем последовательную версию
   if (mpi_initialized == 0) {
     GetOutput() = RunSequentialVersion(GetInput());
     return true;
@@ -305,20 +317,49 @@ bool BellmanFordCRSMPI::RunImpl() {
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
+  // Проверяем количество процессов
+  if (world_size <= 0) {
+    GetOutput() = RunSequentialVersion(GetInput());
+    return true;
+  }
+
+  // Синхронизация перед началом работы (ВАЖНО для стабильности)
+  MPI_Barrier(MPI_COMM_WORLD);
+
   GraphData data = GetGraphData(rank, GetInput());
 
+  // Рассылаем данные графа всем процессам
   BroadcastBasicData(data);
   ResizeBuffers(rank, data);
   BroadcastBuffers(data);
 
+  // Запускаем алгоритм Беллмана-Форда с использованием MPI
   GetOutput() = RunMPIBellmanFord(world_size, rank, data);
+
+  // Синхронизация перед завершением (ВАЖНО для стабильности)
+  MPI_Barrier(MPI_COMM_WORLD);
+
   return true;
 }
 
 bool BellmanFordCRSMPI::PostProcessingImpl() {
+  // Синхронизация перед PostProcessing если MPI инициализирован
+  int mpi_initialized = 0;
+  MPI_Initialized(&mpi_initialized);
+
+  if (mpi_initialized) {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+
   if (GetOutput().capacity() > GetOutput().size() * 2) {
     GetOutput().shrink_to_fit();
   }
+
+  // Финальная синхронизация
+  if (mpi_initialized) {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+
   return true;
 }
 

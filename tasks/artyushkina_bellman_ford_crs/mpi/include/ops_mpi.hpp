@@ -12,6 +12,8 @@ class BellmanFordCRSMPI : public BaseTask {
   }
   explicit BellmanFordCRSMPI(const InType &in);
 
+  ~BellmanFordCRSMPI() override;
+
  private:
   bool ValidationImpl() override;
   bool PreProcessingImpl() override;
