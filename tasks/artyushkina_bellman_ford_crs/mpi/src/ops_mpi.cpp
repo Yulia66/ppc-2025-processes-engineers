@@ -125,8 +125,7 @@ bool ValidateRowPtrMonotonic(const CRSGraph &graph) {
 }
 
 bool ValidateIndices(const CRSGraph &graph) {
-  return std::all_of(graph.col_idx.begin(), graph.col_idx.end(),
-                     [&graph](int32_t idx) { return idx >= 0 && idx < graph.num_vertices; });
+  return std::ranges::all_of(graph.col_idx, [&graph](int32_t idx) { return idx >= 0 && idx < graph.num_vertices; });
 }
 
 bool ValidateCRSGraph(const CRSGraph &graph) {
