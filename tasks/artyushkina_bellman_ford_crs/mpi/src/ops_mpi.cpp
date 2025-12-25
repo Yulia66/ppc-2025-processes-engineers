@@ -2,6 +2,7 @@
 
 #include <mpi.h>
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <limits>
@@ -124,12 +125,8 @@ bool ValidateRowPtrMonotonic(const CRSGraph &graph) {
 }
 
 bool ValidateIndices(const CRSGraph &graph) {
-  for (const auto &idx : graph.col_idx) {
-    if (idx < 0 || idx >= graph.num_vertices) {
-      return false;
-    }
-  }
-  return true;
+  return std::all_of(graph.col_idx.begin(), graph.col_idx.end(),
+                     [&graph](int32_t idx) { return idx >= 0 && idx < graph.num_vertices; });
 }
 
 bool ValidateCRSGraph(const CRSGraph &graph) {
@@ -216,7 +213,7 @@ void ResizeBuffers(int rank, GraphData &data) {
 
 void BroadcastBuffers(GraphData &data) {
   if (data.num_vertices > 0) {
-    const auto row_ptr_bcast_size = static_cast<int>(data.num_vertices + 1);
+    const int row_ptr_bcast_size = data.num_vertices + 1;
     MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT, 0, MPI_COMM_WORLD);
   }
 
