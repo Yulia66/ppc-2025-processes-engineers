@@ -65,7 +65,7 @@ TEST(BellmanFordPerformance, MPISmallGraph) {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
-  if (!mpi_initialized) {
+  if (mpi_initialized == 0) {
     GTEST_SKIP() << "MPI not initialized, skipping MPI performance test";
   }
 
@@ -107,7 +107,9 @@ TEST(BellmanFordPerformance, MPISmallGraph) {
   algorithm.Validation();
   algorithm.PreProcessing();
 
-  std::chrono::high_resolution_clock::time_point start, end;
+  std::chrono::high_resolution_clock::time_point start;
+  std::chrono::high_resolution_clock::time_point end;
+
   if (rank == 0) {
     start = std::chrono::high_resolution_clock::now();
   }

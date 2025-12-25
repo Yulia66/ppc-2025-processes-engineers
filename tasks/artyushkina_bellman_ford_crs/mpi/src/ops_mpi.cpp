@@ -125,12 +125,7 @@ bool ValidateRowPtrMonotonic(const CRSGraph &graph) {
 }
 
 bool ValidateIndices(const CRSGraph &graph) {
-  for (size_t i = 0; i < graph.col_idx.size(); ++i) {
-    if (graph.col_idx[i] < 0 || graph.col_idx[i] >= graph.num_vertices) {
-      return false;
-    }
-  }
-  return true;
+  return std::ranges::all_of(graph.col_idx, [&graph](int32_t idx) { return idx >= 0 && idx < graph.num_vertices; });
 }
 
 bool ValidateCRSGraph(const CRSGraph &graph) {
@@ -166,11 +161,11 @@ bool ValidateCRSGraph(const CRSGraph &graph) {
 }
 
 struct GraphData {
-  int32_t num_vertices{0};
-  int32_t source_vertex{0};
-  int32_t num_edges{0};
-  std::vector<int32_t> row_ptr;
-  std::vector<int32_t> col_idx;
+  int num_vertices{0};
+  int source_vertex{0};
+  int num_edges{0};
+  std::vector<int> row_ptr;
+  std::vector<int> col_idx;
   std::vector<double> values;
 };
 
@@ -178,11 +173,20 @@ GraphData GetGraphData(int rank, const CRSGraph &input_graph) {
   GraphData data;
 
   if (rank == 0) {
-    data.num_vertices = input_graph.num_vertices;
-    data.source_vertex = input_graph.source_vertex;
-    data.num_edges = input_graph.num_edges;
-    data.row_ptr = input_graph.row_ptr;
-    data.col_idx = input_graph.col_idx;
+    data.num_vertices = static_cast<int>(input_graph.num_vertices);
+    data.source_vertex = static_cast<int>(input_graph.source_vertex);
+    data.num_edges = static_cast<int>(input_graph.num_edges);
+
+    data.row_ptr.reserve(input_graph.row_ptr.size());
+    for (const auto &val : input_graph.row_ptr) {
+      data.row_ptr.push_back(static_cast<int>(val));
+    }
+
+    data.col_idx.reserve(input_graph.col_idx.size());
+    for (const auto &val : input_graph.col_idx) {
+      data.col_idx.push_back(static_cast<int>(val));
+    }
+
     data.values = input_graph.values;
   }
 
@@ -190,14 +194,14 @@ GraphData GetGraphData(int rank, const CRSGraph &input_graph) {
 }
 
 void BroadcastBasicData(GraphData &data) {
-  MPI_Bcast(&data.num_vertices, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&data.source_vertex, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
-  MPI_Bcast(&data.num_edges, 1, MPI_INT32_T, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&data.num_vertices, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&data.source_vertex, 1, MPI_INT, 0, MPI_COMM_WORLD);
+  MPI_Bcast(&data.num_edges, 1, MPI_INT, 0, MPI_COMM_WORLD);
 }
 
 void ResizeBuffers(int rank, GraphData &data) {
   if (rank != 0) {
-    const size_t row_ptr_size = (data.num_vertices > 0) ? static_cast<size_t>(data.num_vertices) + 1 : 1;
+    const auto row_ptr_size = (data.num_vertices > 0) ? static_cast<size_t>(data.num_vertices) + 1 : 1;
     const auto data_size = static_cast<size_t>(data.num_edges);
 
     data.row_ptr.resize(row_ptr_size, 0);
@@ -208,17 +212,17 @@ void ResizeBuffers(int rank, GraphData &data) {
 
 void BroadcastBuffers(GraphData &data) {
   if (data.num_vertices > 0) {
-    const auto row_ptr_bcast_size = static_cast<int>(data.num_vertices + 1);
-    MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    const int row_ptr_bcast_size = data.num_vertices + 1;
+    MPI_Bcast(data.row_ptr.data(), row_ptr_bcast_size, MPI_INT, 0, MPI_COMM_WORLD);
   }
 
   if (data.num_edges > 0) {
-    MPI_Bcast(data.col_idx.data(), data.num_edges, MPI_INT32_T, 0, MPI_COMM_WORLD);
+    MPI_Bcast(data.col_idx.data(), data.num_edges, MPI_INT, 0, MPI_COMM_WORLD);
     MPI_Bcast(data.values.data(), data.num_edges, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 }
 
-std::vector<double> InitializeDistances(int32_t num_vertices, int32_t source_vertex) {
+std::vector<double> InitializeDistances(int num_vertices, int source_vertex) {
   if (num_vertices <= 0) {
     return std::vector<double>{};
   }
@@ -235,21 +239,26 @@ std::vector<double> InitializeDistances(int32_t num_vertices, int32_t source_ver
 bool PerformBellmanFordIteration(int world_size, int rank, const GraphData &data, std::vector<double> &distances) {
   bool updated = false;
 
-  for (int32_t vertex = rank; vertex < data.num_vertices; vertex += world_size) {
-    if (ProcessVertex(vertex, data.row_ptr, data.col_idx, data.values, distances, data.num_vertices, data.num_edges)) {
+  for (int vertex = rank; vertex < data.num_vertices; vertex += world_size) {
+    auto vertex_32 = static_cast<int32_t>(vertex);
+    auto num_vertices_32 = static_cast<int32_t>(data.num_vertices);
+    auto num_edges_32 = static_cast<int32_t>(data.num_edges);
+
+    std::vector<int32_t> row_ptr_32(data.row_ptr.begin(), data.row_ptr.end());
+    std::vector<int32_t> col_idx_32(data.col_idx.begin(), data.col_idx.end());
+
+    if (ProcessVertex(vertex_32, row_ptr_32, col_idx_32, data.values, distances, num_vertices_32, num_edges_32)) {
       updated = true;
     }
   }
 
-  // Синхронизируем расстояния между процессами
   MPI_Allreduce(MPI_IN_PLACE, distances.data(), data.num_vertices, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
 
-  // Синхронизируем флаг обновления
   const int local_updated = updated ? 1 : 0;
   int global_updated = 0;
   MPI_Allreduce(&local_updated, &global_updated, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
 
-  return global_updated != 0;
+  return (global_updated != 0);
 }
 
 std::vector<double> RunMPIBellmanFord(int world_size, int rank, GraphData &data) {
@@ -259,7 +268,7 @@ std::vector<double> RunMPIBellmanFord(int world_size, int rank, GraphData &data)
     return distances;
   }
 
-  for (int32_t iter = 0; iter < data.num_vertices - 1; ++iter) {
+  for (int iter = 0; iter < data.num_vertices - 1; ++iter) {
     if (!PerformBellmanFordIteration(world_size, rank, data, distances)) {
       break;
     }
@@ -276,10 +285,7 @@ BellmanFordCRSMPI::BellmanFordCRSMPI(const InType &in) {
   GetOutput() = OutType{};
 }
 
-BellmanFordCRSMPI::~BellmanFordCRSMPI() {
-  // Пустой деструктор - не вызываем MPI_Finalize здесь
-  // Управление жизненным циклом MPI оставляем системе тестирования
-}
+BellmanFordCRSMPI::~BellmanFordCRSMPI() = default;
 
 bool BellmanFordCRSMPI::ValidationImpl() {
   int mpi_initialized = 0;
@@ -289,7 +295,7 @@ bool BellmanFordCRSMPI::ValidationImpl() {
   if (mpi_initialized != 0) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank != 0) {
-      return true;  // Валидация выполняется только на процессе 0
+      return true;
     }
   }
 
@@ -306,7 +312,6 @@ bool BellmanFordCRSMPI::RunImpl() {
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
-  // Если MPI не инициализирован, запускаем последовательную версию
   if (mpi_initialized == 0) {
     GetOutput() = RunSequentialVersion(GetInput());
     return true;
@@ -317,37 +322,31 @@ bool BellmanFordCRSMPI::RunImpl() {
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-  // Проверяем количество процессов
   if (world_size <= 0) {
     GetOutput() = RunSequentialVersion(GetInput());
     return true;
   }
 
-  // Синхронизация перед началом работы (ВАЖНО для стабильности)
   MPI_Barrier(MPI_COMM_WORLD);
 
   GraphData data = GetGraphData(rank, GetInput());
 
-  // Рассылаем данные графа всем процессам
   BroadcastBasicData(data);
   ResizeBuffers(rank, data);
   BroadcastBuffers(data);
 
-  // Запускаем алгоритм Беллмана-Форда с использованием MPI
   GetOutput() = RunMPIBellmanFord(world_size, rank, data);
 
-  // Синхронизация перед завершением (ВАЖНО для стабильности)
   MPI_Barrier(MPI_COMM_WORLD);
 
   return true;
 }
 
 bool BellmanFordCRSMPI::PostProcessingImpl() {
-  // Синхронизация перед PostProcessing если MPI инициализирован
   int mpi_initialized = 0;
   MPI_Initialized(&mpi_initialized);
 
-  if (mpi_initialized) {
+  if (mpi_initialized != 0) {
     MPI_Barrier(MPI_COMM_WORLD);
   }
 
@@ -355,8 +354,7 @@ bool BellmanFordCRSMPI::PostProcessingImpl() {
     GetOutput().shrink_to_fit();
   }
 
-  // Финальная синхронизация
-  if (mpi_initialized) {
+  if (mpi_initialized != 0) {
     MPI_Barrier(MPI_COMM_WORLD);
   }
 
